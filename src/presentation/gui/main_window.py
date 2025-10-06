@@ -576,7 +576,125 @@ class MainWindow:
     
     def test_connection(self):
         """Prueba la conexión seleccionada"""
-        messagebox.showinfo("Función", "Probar conexión - Por implementar")
+        selection = self.connections_tree.selection()
+        if not selection:
+            messagebox.showwarning("Advertencia", "Selecciona una conexión para probar")
+            return
+        
+        # Obtener datos de la conexión seleccionada
+        item = self.connections_tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            messagebox.showerror("Error", "No se pudieron obtener los datos de la conexión")
+            return
+        
+        # Extraer datos de la conexión
+        conexion_id = values[0]
+        nombre = values[1]
+        motor = values[2]
+        servidor = values[3]
+        puerto = int(values[4]) if values[4] else 5432
+        base_datos = values[5]
+        usuario = values[6]
+        
+        # Obtener la conexión completa para tener la contraseña y driver_type
+        try:
+            # Obtener todas las conexiones para encontrar la completa
+            response = self.conexion_ctrl.obtener_todas()
+            if not response.get('success', False):
+                messagebox.showerror("Error", "No se pudieron obtener los datos completos de la conexión")
+                return
+            
+            # Buscar la conexión específica
+            conexion_completa = None
+            for conexion in response.get('data', []):
+                if str(conexion.get('id')) == str(conexion_id):
+                    conexion_completa = conexion
+                    break
+            
+            if not conexion_completa:
+                messagebox.showerror("Error", "No se encontró la conexión seleccionada")
+                return
+            
+            # Solicitar contraseña al usuario
+            from tkinter import simpledialog
+            password = simpledialog.askstring("Contraseña", 
+                                             f"Ingresa la contraseña para la conexión '{nombre}':", 
+                                             show='*')
+            
+            if password is None:  # Usuario canceló
+                return
+            
+            # Mostrar ventana de progreso
+            progress_window = tk.Toplevel(self.root)
+            progress_window.title("Probando Conexión")
+            progress_window.geometry("400x150")
+            progress_window.grab_set()
+            progress_window.resizable(False, False)
+            
+            # Centrar la ventana
+            progress_window.transient(self.root)
+            
+            # Contenido de la ventana de progreso
+            ttk.Label(progress_window, text=f"Probando conexión a '{nombre}'...", 
+                     font=("Arial", 12)).pack(pady=20)
+            
+            progress_bar = ttk.Progressbar(progress_window, mode='indeterminate')
+            progress_bar.pack(pady=10, padx=40, fill='x')
+            progress_bar.start()
+            
+            status_label = ttk.Label(progress_window, text="Conectando...", foreground="blue")
+            status_label.pack(pady=5)
+            
+            # Actualizar la ventana
+            progress_window.update()
+            
+            # Realizar la prueba de conexión
+            driver_type = conexion_completa.get('driver_type', 'default')
+            response = self.conexion_ctrl.probar_conexion(
+                motor=motor,
+                servidor=servidor,
+                puerto=puerto,
+                base_datos=base_datos,
+                usuario=usuario,
+                password=password,
+                driver_type=driver_type
+            )
+            
+            # Cerrar ventana de progreso
+            progress_window.destroy()
+            
+            # Mostrar resultado
+            if response.get('success', False):
+                data = response.get('data', {})
+                mensaje = data.get('mensaje', 'Conexión exitosa')
+                tiempo = data.get('tiempo_respuesta', 'N/A')
+                version = data.get('version_servidor', 'N/A')
+                
+                resultado_texto = f"""✅ CONEXIÓN EXITOSA
+
+Conexión: {nombre}
+Servidor: {servidor}:{puerto}
+Tiempo de respuesta: {tiempo:.2f}s
+Versión del servidor: {version}
+
+Mensaje: {mensaje}"""
+                
+                messagebox.showinfo("Conexión Exitosa", resultado_texto)
+            else:
+                error = response.get('error', 'Error desconocido')
+                messagebox.showerror("Error de Conexión", 
+                                   f"❌ No se pudo conectar a '{nombre}'\n\nError: {error}")
+        
+        except Exception as e:
+            # Cerrar ventana de progreso si existe
+            try:
+                progress_window.destroy()
+            except:
+                pass
+            
+            messagebox.showerror("Error", f"Error al probar la conexión: {str(e)}")
     
     def execute_selected_control(self):
         """Ejecuta el control seleccionado"""

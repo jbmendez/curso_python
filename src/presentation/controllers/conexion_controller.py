@@ -209,7 +209,8 @@ class ConexionController:
         puerto: int,
         base_datos: str,
         usuario: str,
-        password: str
+        password: str,
+        driver_type: str = 'default'
     ) -> Dict[str, Any]:
         """
         Prueba una conexión sin guardarla
@@ -236,6 +237,7 @@ class ConexionController:
                 usuario=usuario,
                 contraseña=password,
                 tipo_motor=motor,
+                driver_type=driver_type,
                 activa=True
             )
             
