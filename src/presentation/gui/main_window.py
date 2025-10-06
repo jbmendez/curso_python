@@ -315,19 +315,29 @@ class MainWindow:
         
     def refresh_controls(self):
         """Actualiza la lista de controles"""
+        print("DEBUG MainWindow - refresh_controls iniciado")
+        
         # Limpiar lista actual
         for item in self.controls_tree.get_children():
             self.controls_tree.delete(item)
         
+        print("DEBUG MainWindow - Lista limpiada, obteniendo controles...")
+        
         try:
             # Obtener controles desde el controlador
             response = self.control_ctrl.obtener_todas()
+            print(f"DEBUG MainWindow - Respuesta del controlador: {response}")
+            
             if response.get('success', False):
                 controles = response.get('data', [])
+                print(f"DEBUG MainWindow - {len(controles)} controles encontrados")
+                
                 for control in controles:
                     descripcion = control.get('descripcion', '')
                     if len(descripcion) > 50:
                         descripcion = descripcion[:50] + "..."
+                    
+                    print(f"DEBUG MainWindow - Insertando control: {control.get('id')} - {control.get('nombre')}")
                     
                     self.controls_tree.insert("", "end", values=(
                         control.get('id', ''),
@@ -337,7 +347,14 @@ class MainWindow:
                         "Activo" if control.get('activo', False) else "Inactivo",
                         control.get('fecha_creacion', '')
                     ))
+                print("DEBUG MainWindow - refresh_controls completado exitosamente")
+            else:
+                print(f"DEBUG MainWindow - Error en respuesta del controlador: {response}")
+                
         except Exception as e:
+            print(f"DEBUG MainWindow - Excepción en refresh_controls: {str(e)}")
+            import traceback
+            traceback.print_exc()
             messagebox.showerror("Error", f"Error al cargar controles: {str(e)}")
     
     def refresh_connections(self):
@@ -468,8 +485,8 @@ class MainWindow:
         # Abrir diálogo de edición
         dialog = EditControlDialog(
             self.root, 
-            self.control_ctrl, 
-            self.conexion_ctrl,
+            self.control_ctrl,
+            self.conexion_ctrl,  # Pasar también el controlador de conexiones
             control_data
         )
         
@@ -477,8 +494,13 @@ class MainWindow:
         self.root.wait_window(dialog.dialog)
         
         # Si se editó exitosamente, actualizar la lista
+        print(f"DEBUG MainWindow - dialog.result: {dialog.result}")
         if dialog.result:
+            print("DEBUG MainWindow - Refrescando controles después de edición...")
             self.refresh_controls()
+            print("DEBUG MainWindow - Controles refrescados")
+        else:
+            print("DEBUG MainWindow - No hay result del dialog, no se refresca")
     
     def delete_control(self):
         """Elimina el control seleccionado"""

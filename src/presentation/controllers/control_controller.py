@@ -204,12 +204,22 @@ class ControlController:
             dict: Respuesta con los datos del control actualizado
         """
         try:
+            print(f"DEBUG ControlController - actualizar_control llamado:")
+            print(f"  control_id: {control_id}")
+            print(f"  nombre: {nombre}")
+            print(f"  descripcion: {descripcion}")
+            print(f"  conexion_id: {conexion_id}")
+            print(f"  disparar_si_hay_datos: {disparar_si_hay_datos}")
+            print(f"  activo: {activo}")
+            
             if self._actualizar_control_use_case is None:
+                print("DEBUG ControlController - ActualizarControlUseCase es None")
                 return {
                     "success": False,
                     "error": "Funcionalidad de actualización no disponible"
                 }
             
+            print("DEBUG ControlController - Creando DTO...")
             # Crear DTO con valores básicos para la actualización
             dto = CrearControlDTO(
                 nombre=nombre,
@@ -223,7 +233,10 @@ class ControlController:
                 activo=activo
             )
             
+            print("DEBUG ControlController - Ejecutando use case...")
             resultado = self._actualizar_control_use_case.ejecutar(control_id, dto)
+            
+            print(f"DEBUG ControlController - Resultado del use case: {resultado}")
             
             return {
                 "success": True,
@@ -239,6 +252,9 @@ class ControlController:
             }
             
         except Exception as e:
+            print(f"DEBUG ControlController - Excepción: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {
                 "success": False,
                 "error": str(e)

@@ -363,42 +363,239 @@ class CreateControlDialog:
 class EditControlDialog:
     """Diálogo para editar control existente"""
     
-    def __init__(self, parent, control_controller, control_data):
+    def __init__(self, parent, control_controller, conexion_controller, control_data):
         self.result = None
         self.control_ctrl = control_controller
+        self.conexion_ctrl = conexion_controller  # Agregar controlador de conexiones
         self.control_data = control_data
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Editar Control")
-        self.dialog.geometry("400x200")
+        self.dialog.geometry("500x400")
         self.dialog.grab_set()
         
         self.create_widgets()
         self.load_data()
         
     def create_widgets(self):
-        """Crea widgets básicos"""
-        frame = ttk.Frame(self.dialog)
-        frame.pack(fill="both", expand=True, padx=20, pady=20)
+        """Crea widgets completos del formulario"""
+        # Frame principal con scroll
+        main_frame = ttk.Frame(self.dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ttk.Label(frame, text="Nombre:").grid(row=0, column=0, sticky="w", pady=5)
+        # Información básica
+        ttk.Label(main_frame, text="Información del Control", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        
+        ttk.Label(main_frame, text="Nombre:").grid(row=1, column=0, sticky="w", pady=5)
         self.nombre_var = tk.StringVar()
-        ttk.Entry(frame, textvariable=self.nombre_var, width=30).grid(row=0, column=1, pady=5)
+        ttk.Entry(main_frame, textvariable=self.nombre_var, width=40).grid(row=1, column=1, pady=5, padx=(10, 0))
         
-        buttons_frame = ttk.Frame(frame)
-        buttons_frame.grid(row=1, column=0, columnspan=2, pady=20)
+        ttk.Label(main_frame, text="Descripción:").grid(row=2, column=0, sticky="nw", pady=5)
+        self.descripcion_var = tk.StringVar()
+        descripcion_entry = tk.Text(main_frame, width=35, height=3)
+        descripcion_entry.grid(row=2, column=1, pady=5, padx=(10, 0))
+        self.descripcion_text = descripcion_entry
+        
+        # Estado del control
+        ttk.Label(main_frame, text="Estado:").grid(row=3, column=0, sticky="w", pady=5)
+        self.activo_var = tk.BooleanVar()
+        ttk.Checkbutton(main_frame, text="Control activo", variable=self.activo_var).grid(row=3, column=1, sticky="w", pady=5, padx=(10, 0))
+        
+        # Configuración de disparo
+        ttk.Label(main_frame, text="Configuración de Disparo", font=("Arial", 10, "bold")).grid(row=4, column=0, columnspan=2, sticky="w", pady=(20, 10))
+        
+        ttk.Label(main_frame, text="Disparar cuando:").grid(row=5, column=0, sticky="w", pady=5)
+        self.disparo_var = tk.StringVar()
+        disparo_frame = ttk.Frame(main_frame)
+        disparo_frame.grid(row=5, column=1, sticky="w", pady=5, padx=(10, 0))
+        
+        ttk.Radiobutton(disparo_frame, text="HAY datos", variable=self.disparo_var, value="true").pack(side="left", padx=(0, 10))
+        ttk.Radiobutton(disparo_frame, text="NO hay datos", variable=self.disparo_var, value="false").pack(side="left")
+        
+        # Conexión asociada
+        ttk.Label(main_frame, text="Conexión:").grid(row=6, column=0, sticky="w", pady=5)
+        self.conexion_var = tk.StringVar()
+        self.conexion_combo = ttk.Combobox(main_frame, textvariable=self.conexion_var, width=37, state="readonly")
+        self.conexion_combo.grid(row=6, column=1, pady=5, padx=(10, 0))
+        
+        # Información adicional
+        info_frame = ttk.Frame(main_frame)
+        info_frame.grid(row=7, column=0, columnspan=2, pady=(20, 0), sticky="ew")
+        
+        ttk.Label(info_frame, text="ID:").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        self.id_label = ttk.Label(info_frame, text="N/A", foreground="gray")
+        self.id_label.grid(row=0, column=1, sticky="w")
+        
+        ttk.Label(info_frame, text="Fecha creación:").grid(row=0, column=2, sticky="w", padx=(20, 10))
+        self.fecha_label = ttk.Label(info_frame, text="N/A", foreground="gray")
+        self.fecha_label.grid(row=0, column=3, sticky="w")
+        
+        # Botones
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.grid(row=8, column=0, columnspan=2, pady=20)
         
         ttk.Button(buttons_frame, text="Actualizar", command=self.update_control).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Cancelar", command=self.cancel).pack(side="left", padx=5)
         
+        # Configurar grid
+        main_frame.columnconfigure(1, weight=1)
+        
+        # Cargar lista de conexiones
+        self._cargar_conexiones()
+        
+    def _cargar_conexiones(self):
+        """Carga la lista de conexiones disponibles"""
+        try:
+            # Obtener conexiones reales desde el controlador
+            if self.conexion_ctrl:
+                response = self.conexion_ctrl.obtener_todas()
+                if response.get('success', False):
+                    conexiones_bd = response.get('data', [])
+                    self.conexiones_disponibles = []
+                    
+                    for conn in conexiones_bd:
+                        self.conexiones_disponibles.append({
+                            "id": conn.get('id'),
+                            "nombre": f"{conn.get('nombre')} (ID: {conn.get('id')})"
+                        })
+                else:
+                    # Fallback si no se pueden obtener las conexiones
+                    self.conexiones_disponibles = [{"id": 1, "nombre": "Conexión no disponible (ID: 1)"}]
+            else:
+                # Fallback si no hay controlador de conexiones
+                self.conexiones_disponibles = [{"id": 1, "nombre": "Sin controlador de conexiones (ID: 1)"}]
+            
+            # Configurar valores del combobox
+            valores_combo = [f"{conn['nombre']}" for conn in self.conexiones_disponibles]
+            self.conexion_combo['values'] = valores_combo
+            
+            # Seleccionar la conexión actual si existe
+            conexion_id_actual = self.control_data.get('conexion_id', 1)
+            for i, conn in enumerate(self.conexiones_disponibles):
+                if conn['id'] == conexion_id_actual:
+                    self.conexion_combo.current(i)
+                    break
+            
+            print(f"DEBUG EditControlDialog - Conexiones cargadas: {self.conexiones_disponibles}")
+            print(f"DEBUG EditControlDialog - Conexión actual ID: {conexion_id_actual}")
+            
+        except Exception as e:
+            print(f"Error cargando conexiones: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback
+            self.conexiones_disponibles = [{"id": 1, "nombre": "Error al cargar conexiones (ID: 1)"}]
+            self.conexion_combo['values'] = ["Error al cargar conexiones (ID: 1)"]
+            self.conexion_combo.current(0)
+        
     def load_data(self):
-        """Carga datos del control"""
-        self.nombre_var.set(self.control_data.get('nombre', ''))
+        """Carga datos del control en el formulario"""
+        if self.control_data:
+            self.nombre_var.set(self.control_data.get('nombre', ''))
+            
+            # Descripción
+            descripcion = self.control_data.get('descripcion', '')
+            self.descripcion_text.delete('1.0', tk.END)
+            self.descripcion_text.insert('1.0', descripcion)
+            
+            # Estado activo
+            self.activo_var.set(self.control_data.get('activo', True))
+            
+            # Configuración de disparo
+            disparar_si_hay_datos = self.control_data.get('disparar_si_hay_datos', True)
+            self.disparo_var.set("true" if disparar_si_hay_datos else "false")
+            
+            # Conexión
+            conexion_nombre = self.control_data.get('conexion_nombre', '')
+            if conexion_nombre:
+                self.conexion_var.set(conexion_nombre)
+            
+            # Información adicional
+            control_id = self.control_data.get('id', 'N/A')
+            self.id_label.config(text=str(control_id))
+            
+            fecha_creacion = self.control_data.get('fecha_creacion', 'N/A')
+            self.fecha_label.config(text=str(fecha_creacion))
         
     def update_control(self):
-        """Actualiza el control (simplificado)"""
-        messagebox.showinfo("Info", "Funcionalidad de edición de control simplificada")
-        self.dialog.destroy()
+        """Actualiza el control con los datos del formulario"""
+        try:
+            # Validaciones básicas
+            nombre = self.nombre_var.get().strip()
+            if not nombre:
+                messagebox.showerror("Error", "El nombre del control es requerido")
+                return
+            
+            # Obtener datos del formulario
+            descripcion = self.descripcion_text.get('1.0', tk.END).strip()
+            activo = self.activo_var.get()
+            disparar_si_hay_datos = self.disparo_var.get() == "true"
+            
+            # Obtener ID del control
+            control_id = self.control_data.get('id')
+            if not control_id:
+                messagebox.showerror("Error", "No se pudo obtener el ID del control")
+                return
+            
+            # Debug: mostrar datos que se van a enviar
+            print(f"DEBUG - Actualizando control:")
+            print(f"  ID: {control_id}")
+            print(f"  Nombre: {nombre}")
+            print(f"  Descripción: {descripcion}")
+            print(f"  Activo: {activo}")
+            print(f"  Disparar si hay datos: {disparar_si_hay_datos}")
+            
+            # Obtener el ID real de la conexión seleccionada
+            conexion_seleccionada_idx = self.conexion_combo.current()
+            if conexion_seleccionada_idx >= 0 and conexion_seleccionada_idx < len(self.conexiones_disponibles):
+                conexion_id = self.conexiones_disponibles[conexion_seleccionada_idx]['id']
+            else:
+                conexion_id = self.control_data.get('conexion_id', 1)  # Fallback
+                
+            print(f"  Conexión seleccionada índice: {conexion_seleccionada_idx}")
+            print(f"  Conexión ID: {conexion_id}")
+            
+            # Verificar que el controlador esté disponible
+            if not self.control_ctrl:
+                messagebox.showerror("Error", "Controlador de control no está disponible")
+                return
+            
+            print("DEBUG - Llamando al controlador...")
+            
+            # Llamar al controlador para actualizar
+            response = self.control_ctrl.actualizar_control(
+                control_id=int(control_id),
+                nombre=nombre,
+                descripcion=descripcion,
+                conexion_id=int(conexion_id),
+                disparar_si_hay_datos=disparar_si_hay_datos,
+                activo=activo
+            )
+            
+            print(f"DEBUG - Respuesta del controlador: {response}")
+            
+            if response.get('success', False):
+                messagebox.showinfo("Éxito", f"Control '{nombre}' actualizado exitosamente")
+                
+                self.result = {
+                    'success': True,
+                    'data': response.get('data', {}),
+                    'nombre': nombre,
+                    'descripcion': descripcion,
+                    'activo': activo,
+                    'disparar_si_hay_datos': disparar_si_hay_datos
+                }
+                
+                self.dialog.destroy()
+            else:
+                error = response.get('error', 'Error desconocido')
+                messagebox.showerror("Error", f"No se pudo actualizar el control: {error}")
+            
+        except Exception as e:
+            print(f"DEBUG - Excepción: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Error", f"Error al actualizar el control: {str(e)}")
         
     def cancel(self):
         """Cancela la operación"""

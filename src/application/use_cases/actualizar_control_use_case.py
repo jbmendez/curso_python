@@ -28,13 +28,21 @@ class ActualizarControlUseCase:
         Raises:
             ValueError: Si el control no existe o los datos son inválidos
         """
+        print(f"DEBUG ActualizarControlUseCase - ejecutar llamado:")
+        print(f"  control_id: {control_id}")
+        print(f"  dto: {dto}")
+        
         # Verificar que el control existe usando el método correcto
         try:
+            print("DEBUG ActualizarControlUseCase - Cargando control existente...")
             control_existente = self._control_service.cargar_control_completo(control_id)
-        except ValueError:
+            print(f"DEBUG ActualizarControlUseCase - Control existente encontrado: {control_existente}")
+        except ValueError as e:
+            print(f"DEBUG ActualizarControlUseCase - Error al cargar control: {e}")
             raise ValueError(f"No se encontró el control con ID {control_id}")
         
         # Crear el control actualizado manteniendo algunos datos existentes
+        print("DEBUG ActualizarControlUseCase - Creando control actualizado...")
         control_actualizado = Control(
             id=control_id,
             nombre=dto.nombre,
@@ -48,11 +56,18 @@ class ActualizarControlUseCase:
             activo=dto.activo,  # Usar el valor del DTO
             fecha_creacion=control_existente.fecha_creacion,  # Mantener fecha original
         )
+        print(f"DEBUG ActualizarControlUseCase - Control actualizado creado: {control_actualizado}")
         
         # Validar el control actualizado
+        print("DEBUG ActualizarControlUseCase - Validando control...")
         errores = self._control_service.validar_control_para_creacion(control_actualizado)
         if errores:
+            print(f"DEBUG ActualizarControlUseCase - Errores de validación: {errores}")
             raise ValueError(f"Errores de validación: {', '.join(errores)}")
         
         # Guardar el control actualizado usando el repositorio
-        return self._control_repository.guardar(control_actualizado)
+        print("DEBUG ActualizarControlUseCase - Guardando control actualizado...")
+        resultado = self._control_repository.guardar(control_actualizado)
+        print(f"DEBUG ActualizarControlUseCase - Control guardado: {resultado}")
+        
+        return resultado
