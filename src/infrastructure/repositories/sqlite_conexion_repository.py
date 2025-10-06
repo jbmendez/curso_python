@@ -17,6 +17,7 @@ class SQLiteConexionRepository(ConexionRepository):
     def _crear_tabla(self):
         """Crea la tabla de conexiones si no existe"""
         with sqlite3.connect(self.db_path) as conn:
+            # Crear tabla original
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conexiones (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,6 +31,13 @@ class SQLiteConexionRepository(ConexionRepository):
                     activa BOOLEAN DEFAULT 1
                 )
             """)
+            
+            # Agregar columna driver_type si no existe (migración)
+            try:
+                conn.execute("ALTER TABLE conexiones ADD COLUMN driver_type TEXT DEFAULT 'default'")
+            except sqlite3.OperationalError:
+                # La columna ya existe
+                pass
     
     def obtener_por_id(self, id: int) -> Optional[Conexion]:
         """Obtiene una conexión por su ID"""
@@ -84,10 +92,11 @@ class SQLiteConexionRepository(ConexionRepository):
                 # Crear nueva conexión
                 cursor = conn.execute(
                     """INSERT INTO conexiones 
-                       (nombre, base_datos, servidor, puerto, usuario, contraseña, tipo_motor, activa) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       (nombre, base_datos, servidor, puerto, usuario, contraseña, tipo_motor, driver_type, activa) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (conexion.nombre, conexion.base_datos, conexion.servidor, conexion.puerto,
-                     conexion.usuario, conexion.contraseña, conexion.tipo_motor, conexion.activa)
+                     conexion.usuario, conexion.contraseña, conexion.tipo_motor, 
+                     getattr(conexion, 'driver_type', 'default'), conexion.activa)
                 )
                 conexion.id = cursor.lastrowid
             else:
@@ -95,11 +104,11 @@ class SQLiteConexionRepository(ConexionRepository):
                 conn.execute(
                     """UPDATE conexiones 
                        SET nombre=?, base_datos=?, servidor=?, puerto=?, usuario=?, 
-                           contraseña=?, tipo_motor=?, activa=? 
+                           contraseña=?, tipo_motor=?, driver_type=?, activa=? 
                        WHERE id=?""",
                     (conexion.nombre, conexion.base_datos, conexion.servidor, conexion.puerto,
                      conexion.usuario, conexion.contraseña, conexion.tipo_motor, 
-                     conexion.activa, conexion.id)
+                     getattr(conexion, 'driver_type', 'default'), conexion.activa, conexion.id)
                 )
             
             return conexion
@@ -118,6 +127,12 @@ class SQLiteConexionRepository(ConexionRepository):
     
     def _row_to_conexion(self, row: sqlite3.Row) -> Conexion:
         """Convierte una fila de base de datos a una entidad Conexión"""
+        # Obtener driver_type de manera segura
+        try:
+            driver_type = row['driver_type']
+        except (IndexError, KeyError):
+            driver_type = 'default'
+        
         return Conexion(
             id=row['id'],
             nombre=row['nombre'],
@@ -127,5 +142,6 @@ class SQLiteConexionRepository(ConexionRepository):
             usuario=row['usuario'],
             contraseña=row['contraseña'],
             tipo_motor=row['tipo_motor'],
+            driver_type=driver_type,
             activa=bool(row['activa'])
         )

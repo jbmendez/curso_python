@@ -1,18 +1,78 @@
 """
-Servicio de prueba de conexión para IBM i Series (AS/400).
+Servicio de prueba de conexión para IBM i Series (AS/400) con timeouts robustos.
 """
 from typing import Dict, Any
 import pyodbc
+import threading
+import time
 from src.domain.entities.conexion import Conexion
 from src.domain.services.conexion_test_service import ConexionTestService, ResultadoPruebaConexion
 
 
 class IBMiSeriesConexionTest(ConexionTestService):
-    """Servicio para probar conexiones a IBM i Series (AS/400)."""
+    """Servicio para probar conexiones a IBM i Series (AS/400) con protección contra cuelgues."""
     
     def tipos_soportados(self) -> list:
         """Retorna los tipos de base de datos soportados por este servicio."""
         return ["IBM i Series", "AS/400", "iSeries", "IBM i"]
+    
+    def _probar_conexion_con_timeout(self, connection_string: str, timeout_seconds: int = 45) -> tuple:
+        """
+        Prueba la conexión con timeout usando threading para evitar cuelgues.
+        
+        Returns:
+            tuple: (exitoso: bool, resultado: dict/str, tiempo_elapsed: float)
+        """
+        resultado = {'exitoso': False, 'datos': None, 'error': None}
+        
+        def _conectar():
+            try:
+                start_time = time.time()
+                # Configurar pyodbc para evitar cuelgues
+                pyodbc.pooling = False
+                
+                with pyodbc.connect(connection_string, timeout=30) as conn:
+                    conn.timeout = 30
+                    conn.autocommit = True
+                    
+                    with conn.cursor() as cursor:
+                        cursor.timeout = 20
+                        
+                        # Consulta simple y rápida
+                        cursor.execute("SELECT CURRENT_DATE, CURRENT_TIME, CURRENT_USER FROM SYSIBM.SYSDUMMY1")
+                        row = cursor.fetchone()
+                        
+                        if row:
+                            resultado['exitoso'] = True
+                            resultado['datos'] = {
+                                'fecha_sistema': str(row[0]) if row[0] else "N/A",
+                                'hora_sistema': str(row[1]) if row[1] else "N/A", 
+                                'usuario_conectado': str(row[2]) if row[2] else "N/A",
+                                'tiempo_conexion': time.time() - start_time
+                            }
+                        else:
+                            resultado['error'] = "No se obtuvieron datos del sistema"
+                            
+            except Exception as e:
+                resultado['error'] = str(e)
+        
+        # Ejecutar en thread con timeout
+        start_time = time.time()
+        thread = threading.Thread(target=_conectar)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=timeout_seconds)
+        
+        elapsed_time = time.time() - start_time
+        
+        if thread.is_alive():
+            # Thread todavía corriendo = timeout
+            return False, f"Timeout después de {timeout_seconds}s - conexión se colgó", elapsed_time
+        elif resultado['exitoso']:
+            return True, resultado['datos'], elapsed_time
+        else:
+            error_msg = resultado['error'] or "Error desconocido"
+            return False, error_msg, elapsed_time
     
     def probar_conexion(self, conexion: Conexion) -> ResultadoPruebaConexion:
         """
@@ -63,41 +123,37 @@ class IBMiSeriesConexionTest(ConexionTestService):
                 driver, servidor, puerto, usuario, password, base_datos, ssl
             )
             
-            # Intentar conexión
-            with pyodbc.connect(connection_string, timeout=10) as conn:
-                # Ejecutar consulta de prueba
-                with conn.cursor() as cursor:
-                    # Consulta para obtener información del sistema
-                    cursor.execute("SELECT CURRENT_DATE, CURRENT_TIME, CURRENT_USER FROM SYSIBM.SYSDUMMY1")
-                    resultado = cursor.fetchone()
-                    
-                    fecha_actual = resultado[0] if resultado else "N/A"
-                    hora_actual = resultado[1] if resultado else "N/A"
-                    usuario_actual = resultado[2] if resultado else "N/A"
-                    
-                    # Obtener información adicional del sistema
-                    info_sistema = self._obtener_info_sistema(cursor)
-                    
-                    info_adicional = {
-                        "driver_usado": driver,
-                        "fecha_sistema": str(fecha_actual),
-                        "hora_sistema": str(hora_actual),
-                        "usuario_conectado": str(usuario_actual),
-                        "servidor": servidor,
-                        "puerto": puerto,
-                        "ssl_habilitado": ssl,
-                        **info_sistema
-                    }
-                    
-                    if base_datos:
-                        info_adicional["biblioteca_defecto"] = base_datos
-                    
-                    return ResultadoPruebaConexion(
-                        exitosa=True,
-                        mensaje=f"Conexión exitosa a IBM i Series {servidor}",
-                        version_servidor=f"Conectado usando {driver}",
-                        detalles_error=f"Info: {info_adicional}"
-                    )
+            # Usar conexión con timeout robusto para evitar cuelgues
+            print(f"[DEBUG] Probando conexión ODBC con timeout de 45s...")
+            exitoso, datos, tiempo_elapsed = self._probar_conexion_con_timeout(connection_string, 45)
+            
+            if exitoso:
+                info_adicional = {
+                    "driver_usado": driver,
+                    "servidor": servidor,
+                    "puerto": puerto,
+                    "ssl_habilitado": ssl,
+                    "tiempo_respuesta_real": tiempo_elapsed,
+                    **datos
+                }
+                
+                if base_datos:
+                    info_adicional["biblioteca_defecto"] = base_datos
+                
+                return ResultadoPruebaConexion(
+                    exitosa=True,
+                    mensaje=f"Conexión exitosa a IBM i Series {servidor} en {tiempo_elapsed:.2f}s",
+                    version_servidor=f"Conectado usando {driver}",
+                    tiempo_respuesta=tiempo_elapsed,
+                    info_adicional=info_adicional
+                )
+            else:
+                return ResultadoPruebaConexion(
+                    exitosa=False,
+                    mensaje=f"[ODBC] No se puede conectar al servidor IBM i Series {servidor}",
+                    tiempo_respuesta=tiempo_elapsed,
+                    detalles_error=f"Error después de {tiempo_elapsed:.2f}s: {datos}"
+                )
                     
         except pyodbc.Error as e:
             return self._manejar_error_pyodbc(e, servidor)
@@ -154,20 +210,32 @@ class IBMiSeriesConexionTest(ConexionTestService):
     def _construir_cadena_conexion(self, driver: str, servidor: str, puerto: int, 
                                  usuario: str, password: str, base_datos: str = "", 
                                  ssl: bool = True) -> str:
-        """Construye la cadena de conexión para IBM i Series."""
-        # Cadena base
-        connection_string = f"DRIVER={{{driver}}};SYSTEM={servidor};PORT={puerto};UID={usuario};PWD={password};"
+        """Construye la cadena de conexión para IBM i Series con timeouts configurados."""
+        # Cadena base - para IBM DB2 ODBC DRIVER usamos DATABASE en lugar de DBQ
+        if "IBM DB2" in driver:
+            # Para drivers DB2 nativos
+            connection_string = f"DRIVER={{{driver}}};HOSTNAME={servidor};PORT={puerto};DATABASE={base_datos or 'QSYS'};UID={usuario};PWD={password};"
+            if ssl:
+                connection_string += "SECURITY=SSL;"
+        else:
+            # Para drivers IBM i Access tradicionales
+            connection_string = f"DRIVER={{{driver}}};SYSTEM={servidor};PORT={puerto};UID={usuario};PWD={password};"
+            if ssl:
+                connection_string += "SSL=1;"
+            # Biblioteca por defecto
+            if base_datos:
+                connection_string += f"DBQ={base_datos};"
         
-        # Configuraciones de seguridad
-        if ssl:
-            connection_string += "SSL=1;"
-        
-        # Biblioteca por defecto
-        if base_datos:
-            connection_string += f"DBQ={base_datos};"
-        
-        # Configuraciones adicionales comunes para IBM i
-        connection_string += "LANGUAGEID=ENU;QRYSTGLMT=-1;BLOCKFETCH=1;BLOCKSIZE=128;PREFETCH=1;"
+        # Configuraciones adicionales para IBM i con timeouts
+        connection_string += (
+            "LANGUAGEID=ENU;"
+            "QRYSTGLMT=-1;"
+            "CONNECTTIMEOUT=30;"     # Timeout de conexión en segundos
+            "QUERYTIMEOUT=60;"       # Timeout de consulta en segundos
+            "LOGINTIMEOUT=30;"       # Timeout de login
+            "AUTOCOMMIT=1;"          # Habilitar autocommit
+            "PROTOCOL=TCPIP;"        # Forzar protocolo TCP/IP
+        )
         
         return connection_string
     

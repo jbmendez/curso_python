@@ -19,6 +19,7 @@ class Conexion:
     usuario: str = ""
     contraseña: str = ""
     tipo_motor: str = "postgresql"  # postgresql, mysql, sqlite, sqlserver, iseries
+    driver_type: str = "default"  # Para IBM i: "odbc" o "jdbc", para otros: "default"
     activa: bool = True
     
     def es_configuracion_valida(self) -> bool:

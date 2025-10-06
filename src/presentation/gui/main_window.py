@@ -26,6 +26,8 @@ from src.infrastructure.services.mysql_conexion_test import MySQLConexionTest
 from src.infrastructure.services.sqlserver_conexion_test import SQLServerConexionTest
 from src.infrastructure.services.sqlite_conexion_test import SQLiteConexionTest
 from src.infrastructure.services.ibmiseries_conexion_test import IBMiSeriesConexionTest
+from src.infrastructure.services.ibmiseries_jdbc_conexion_test import IBMiSeriesJDBCConexionTest
+from src.infrastructure.services.ibmiseries_selector import IBMiSeriesConexionSelector
 
 from src.application.use_cases.registrar_usuario_use_case import RegistrarUsuarioUseCase
 from src.application.use_cases.crear_control_use_case import CrearControlUseCase
@@ -722,11 +724,18 @@ class MainWindow:
             sqlite_service
         )
         
-        # Registrar servicio IBM i Series
-        ibmiseries_service = IBMiSeriesConexionTest()
+        # Registrar servicio IBM i Series (Selector inteligente)
+        ibmiseries_selector = IBMiSeriesConexionSelector()
         ConexionTestFactory.registrar_servicio(
-            ibmiseries_service.tipos_soportados(), 
-            ibmiseries_service
+            ibmiseries_selector.tipos_soportados(), 
+            ibmiseries_selector
+        )
+        
+        # Registrar servicios específicos para acceso directo si es necesario
+        ibmiseries_jdbc_service = IBMiSeriesJDBCConexionTest()
+        ConexionTestFactory.registrar_servicio(
+            ibmiseries_jdbc_service.tipos_soportados(), 
+            ibmiseries_jdbc_service
         )
         
         print(f"✅ Servicios de conexión registrados: {ConexionTestFactory.tipos_soportados()}")

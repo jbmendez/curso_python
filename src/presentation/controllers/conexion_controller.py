@@ -49,6 +49,7 @@ class ConexionController:
                     'base_datos': conexion.base_datos,
                     'usuario': conexion.usuario,
                     'activa': conexion.activa,
+                    'driver_type': getattr(conexion, 'driver_type', 'default')
                 }
                 conexiones_data.append(conexion_data)
             
@@ -74,7 +75,8 @@ class ConexionController:
         puerto: int,
         base_datos: str,
         usuario: str,
-        password: str
+        password: str,
+        driver_type: str = 'default'
     ) -> Dict[str, Any]:
         """
         Crea una nueva conexión
@@ -87,6 +89,7 @@ class ConexionController:
             base_datos: Nombre de la base de datos
             usuario: Usuario para la conexión
             password: Contraseña para la conexión
+            driver_type: Tipo de driver (para IBM i Series: 'odbc', 'jdbc', 'auto')
             
         Returns:
             dict: Respuesta con los datos de la conexión creada
@@ -99,7 +102,8 @@ class ConexionController:
                 puerto=puerto,
                 base_datos=base_datos,
                 usuario=usuario,
-                password=password
+                password=password,
+                driver_type=driver_type
             )
             
             resultado = self._crear_conexion_use_case.ejecutar(dto)
@@ -114,7 +118,8 @@ class ConexionController:
                     "puerto": resultado.puerto,
                     "base_datos": resultado.base_datos,
                     "usuario": resultado.usuario,
-                    "activa": resultado.activa
+                    "activa": resultado.activa,
+                    "driver_type": getattr(resultado, 'driver_type', 'default')
                 }
             }
             
@@ -134,7 +139,8 @@ class ConexionController:
         base_datos: str,
         usuario: str,
         password: str,
-        activa: bool = True
+        activa: bool = True,
+        driver_type: str = 'default'
     ) -> Dict[str, Any]:
         """
         Actualiza una conexión existente
@@ -148,6 +154,8 @@ class ConexionController:
             base_datos: Nombre de la base de datos
             usuario: Usuario para la conexión
             password: Contraseña para la conexión
+            activa: Si la conexión está activa
+            driver_type: Tipo de driver (para IBM i Series)
             
         Returns:
             dict: Respuesta con los datos de la conexión actualizada
@@ -167,7 +175,8 @@ class ConexionController:
                 base_datos=base_datos,
                 usuario=usuario,
                 password=password,
-                activa=activa
+                activa=activa,
+                driver_type=driver_type
             )
             
             resultado = self._actualizar_conexion_use_case.ejecutar(conexion_id, dto)
@@ -182,7 +191,8 @@ class ConexionController:
                     "puerto": resultado.puerto,
                     "base_datos": resultado.base_datos,
                     "usuario": resultado.usuario,
-                    "activa": resultado.activa
+                    "activa": resultado.activa,
+                    "driver_type": getattr(resultado, 'driver_type', 'default')
                 }
             }
             

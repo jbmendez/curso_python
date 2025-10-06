@@ -8,3 +8,4 @@ mypy>=0.950
 psycopg2-binary>=2.9.0  # PostgreSQL
 pymysql>=1.0.0          # MySQL/MariaDB
 pyodbc>=4.0.0           # SQL Server e IBM i Series (requiere ODBC driver instalado en el sistema)
+jaydebeapi>=1.2.3       # IBM i Series JDBC (requiere jt400.jar descargado por separado)

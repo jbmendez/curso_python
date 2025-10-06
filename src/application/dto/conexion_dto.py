@@ -15,6 +15,7 @@ class CrearConexionDTO:
     base_datos: str
     usuario: str
     password: str
+    driver_type: str = 'default'
     activa: bool = True
     
 
@@ -41,4 +42,5 @@ class ActualizarConexionDTO:
     base_datos: Optional[str] = None
     usuario: Optional[str] = None
     password: Optional[str] = None
+    driver_type: Optional[str] = None
     activa: Optional[bool] = None

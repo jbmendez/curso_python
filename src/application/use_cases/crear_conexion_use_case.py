@@ -30,6 +30,7 @@ class CrearConexionUseCase:
             base_datos=datos.base_datos,
             usuario=datos.usuario,
             contraseña=datos.password,
+            driver_type=datos.driver_type,
             activa=True
         )
         
