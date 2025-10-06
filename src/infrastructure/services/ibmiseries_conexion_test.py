@@ -26,10 +26,10 @@ class IBMiSeriesConexionTest(ConexionTestService):
         """
         try:
             # Extraer parámetros de la entidad conexion
-            servidor = conexion.host or ''
+            servidor = conexion.servidor or ''
             puerto = conexion.puerto or 446  # Puerto por defecto para SSL
             usuario = conexion.usuario or ''
-            password = conexion.password or ''
+            password = conexion.contraseña or ''
             base_datos = conexion.base_datos or ''
             # Para IBM i Series podríamos usar conexion.motor para configuraciones específicas
             ssl = True  # Por defecto SSL habilitado
