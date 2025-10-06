@@ -3,6 +3,7 @@ Servicio de prueba de conexión para IBM i Series (AS/400).
 """
 from typing import Dict, Any
 import pyodbc
+from src.domain.entities.conexion import Conexion
 from src.domain.services.conexion_test_service import ConexionTestService, ResultadoPruebaConexion
 
 
@@ -13,58 +14,48 @@ class IBMiSeriesConexionTest(ConexionTestService):
         """Retorna los tipos de base de datos soportados por este servicio."""
         return ["IBM i Series", "AS/400", "iSeries", "IBM i"]
     
-    def probar_conexion(self, parametros_conexion: Dict[str, Any]) -> ResultadoPruebaConexion:
+    def probar_conexion(self, conexion: Conexion) -> ResultadoPruebaConexion:
         """
         Prueba la conexión a IBM i Series.
         
         Args:
-            parametros_conexion: Diccionario con parámetros de conexión:
-                - servidor: Nombre o IP del servidor IBM i
-                - puerto: Puerto (por defecto 446 para encrypted, 8471 para unencrypted)
-                - base_datos: Nombre de la biblioteca por defecto (opcional)
-                - usuario: Usuario de IBM i
-                - password: Contraseña
-                - driver: Driver ODBC específico (opcional)
-                - ssl: Si usar SSL (por defecto True)
+            conexion: Entidad de conexión con los datos necesarios
                 
         Returns:
             ResultadoPruebaConexion con el resultado de la prueba
         """
         try:
-            # Extraer parámetros
-            servidor = parametros_conexion.get('servidor', '').strip()
-            puerto = parametros_conexion.get('puerto', 446)  # Puerto por defecto para SSL
-            usuario = parametros_conexion.get('usuario', '').strip()
-            password = parametros_conexion.get('password', '')
-            base_datos = parametros_conexion.get('base_datos', '').strip()
-            driver_personalizado = parametros_conexion.get('driver', '').strip()
-            ssl = parametros_conexion.get('ssl', True)
+            # Extraer parámetros de la entidad conexion
+            servidor = conexion.host or ''
+            puerto = conexion.puerto or 446  # Puerto por defecto para SSL
+            usuario = conexion.usuario or ''
+            password = conexion.password or ''
+            base_datos = conexion.base_datos or ''
+            # Para IBM i Series podríamos usar conexion.motor para configuraciones específicas
+            ssl = True  # Por defecto SSL habilitado
             
             # Validaciones básicas
             if not servidor:
                 return ResultadoPruebaConexion(
-                    exitoso=False,
+                    exitosa=False,
                     mensaje="El servidor es requerido",
-                    categoria_error="CONFIGURACION",
-                    detalles_tecnicos="Parámetro 'servidor' vacío o no proporcionado"
+                    detalles_error="Parámetro 'servidor' vacío o no proporcionado"
                 )
             
             if not usuario:
                 return ResultadoPruebaConexion(
-                    exitoso=False,
+                    exitosa=False,
                     mensaje="El usuario es requerido",
-                    categoria_error="CONFIGURACION",
-                    detalles_tecnicos="Parámetro 'usuario' vacío o no proporcionado"
+                    detalles_error="Parámetro 'usuario' vacío o no proporcionado"
                 )
             
             # Detectar driver disponible
-            driver = self._detectar_driver_ibmi(driver_personalizado)
+            driver = self._detectar_driver_ibmi()
             if not driver:
                 return ResultadoPruebaConexion(
-                    exitoso=False,
+                    exitosa=False,
                     mensaje="No se encontró driver ODBC para IBM i Series",
-                    categoria_error="DRIVER",
-                    detalles_tecnicos=self._listar_drivers_disponibles()
+                    detalles_error=self._listar_drivers_disponibles()
                 )
             
             # Construir cadena de conexión
@@ -102,20 +93,19 @@ class IBMiSeriesConexionTest(ConexionTestService):
                         info_adicional["biblioteca_defecto"] = base_datos
                     
                     return ResultadoPruebaConexion(
-                        exitoso=True,
+                        exitosa=True,
                         mensaje=f"Conexión exitosa a IBM i Series {servidor}",
-                        detalles_tecnicos=f"Conectado usando {driver}",
-                        info_adicional=info_adicional
+                        version_servidor=f"Conectado usando {driver}",
+                        detalles_error=f"Info: {info_adicional}"
                     )
                     
         except pyodbc.Error as e:
             return self._manejar_error_pyodbc(e, servidor)
         except Exception as e:
             return ResultadoPruebaConexion(
-                exitoso=False,
+                exitosa=False,
                 mensaje=f"Error inesperado: {str(e)}",
-                categoria_error="DESCONOCIDO",
-                detalles_tecnicos=f"Tipo de error: {type(e).__name__}"
+                detalles_error=f"Tipo de error: {type(e).__name__}"
             )
     
     def _detectar_driver_ibmi(self, driver_personalizado: str = "") -> str:
@@ -237,52 +227,46 @@ class IBMiSeriesConexionTest(ConexionTestService):
         # Errores de conexión de red
         if any(term in error_msg for term in ['connection', 'network', 'timeout', 'host']):
             return ResultadoPruebaConexion(
-                exitoso=False,
+                exitosa=False,
                 mensaje=f"No se puede conectar al servidor IBM i Series {servidor}",
-                categoria_error="RED",
-                detalles_tecnicos=f"Error de conectividad: {str(error)}"
+                detalles_error=f"Error de conectividad: {str(error)}"
             )
         
         # Errores de autenticación
         if any(term in error_msg for term in ['authentication', 'login', 'password', 'user', 'invalid']):
             return ResultadoPruebaConexion(
-                exitoso=False,
+                exitosa=False,
                 mensaje="Credenciales inválidas para IBM i Series",
-                categoria_error="AUTENTICACION",
-                detalles_tecnicos=f"Error de autenticación: {str(error)}"
+                detalles_error=f"Error de autenticación: {str(error)}"
             )
         
         # Errores de SSL/TLS
         if any(term in error_msg for term in ['ssl', 'tls', 'certificate', 'encryption']):
             return ResultadoPruebaConexion(
-                exitoso=False,
+                exitosa=False,
                 mensaje="Error de SSL/TLS en la conexión",
-                categoria_error="SSL",
-                detalles_tecnicos=f"Error de seguridad: {str(error)}"
+                detalles_error=f"Error de seguridad: {str(error)}"
             )
         
         # Errores de driver
         if any(term in error_msg for term in ['driver', 'odbc', 'data source']):
             return ResultadoPruebaConexion(
-                exitoso=False,
+                exitosa=False,
                 mensaje="Error con el driver ODBC de IBM i Series",
-                categoria_error="DRIVER",
-                detalles_tecnicos=f"Error de driver: {str(error)}"
+                detalles_error=f"Error de driver: {str(error)}"
             )
         
         # Errores de biblioteca/esquema
         if any(term in error_msg for term in ['library', 'schema', 'object', 'not found']):
             return ResultadoPruebaConexion(
-                exitoso=False,
+                exitosa=False,
                 mensaje="Biblioteca o objeto no encontrado en IBM i Series",
-                categoria_error="CONFIGURACION",
-                detalles_tecnicos=f"Error de biblioteca: {str(error)}"
+                detalles_error=f"Error de biblioteca: {str(error)}"
             )
         
         # Error genérico
         return ResultadoPruebaConexion(
-            exitoso=False,
+            exitosa=False,
             mensaje=f"Error de IBM i Series: {str(error)}",
-            categoria_error="DATABASE",
-            detalles_tecnicos=f"Error ODBC: {str(error)}"
+            detalles_error=f"Error ODBC: {str(error)}"
         )
