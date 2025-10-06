@@ -25,6 +25,7 @@ from src.infrastructure.services.postgresql_conexion_test import PostgreSQLConex
 from src.infrastructure.services.mysql_conexion_test import MySQLConexionTest
 from src.infrastructure.services.sqlserver_conexion_test import SQLServerConexionTest
 from src.infrastructure.services.sqlite_conexion_test import SQLiteConexionTest
+from src.infrastructure.services.ibmiseries_conexion_test import IBMiSeriesConexionTest
 
 from src.application.use_cases.registrar_usuario_use_case import RegistrarUsuarioUseCase
 from src.application.use_cases.crear_control_use_case import CrearControlUseCase
@@ -719,6 +720,13 @@ class MainWindow:
         ConexionTestFactory.registrar_servicio(
             sqlite_service.tipos_soportados(), 
             sqlite_service
+        )
+        
+        # Registrar servicio IBM i Series
+        ibmiseries_service = IBMiSeriesConexionTest()
+        ConexionTestFactory.registrar_servicio(
+            ibmiseries_service.tipos_soportados(), 
+            ibmiseries_service
         )
         
         print(f"✅ Servicios de conexión registrados: {ConexionTestFactory.tipos_soportados()}")

@@ -7,4 +7,4 @@ mypy>=0.950
 # Drivers de base de datos
 psycopg2-binary>=2.9.0  # PostgreSQL
 pymysql>=1.0.0          # MySQL/MariaDB
-pyodbc>=4.0.0           # SQL Server (requiere ODBC driver instalado en el sistema)
+pyodbc>=4.0.0           # SQL Server e IBM i Series (requiere ODBC driver instalado en el sistema)
