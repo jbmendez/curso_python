@@ -3,3 +3,8 @@ pytest>=7.0.0
 black>=22.0.0
 flake8>=4.0.0
 mypy>=0.950
+
+# Drivers de base de datos
+psycopg2-binary>=2.9.0  # PostgreSQL
+pymysql>=1.0.0          # MySQL/MariaDB
+pyodbc>=4.0.0           # SQL Server (requiere ODBC driver instalado en el sistema)

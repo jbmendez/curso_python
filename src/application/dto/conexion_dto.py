@@ -15,6 +15,7 @@ class CrearConexionDTO:
     base_datos: str
     usuario: str
     password: str
+    activa: bool = True
     
 
 @dataclass  

@@ -17,6 +17,7 @@ class CrearControlDTO:
     consultas_a_disparar_ids: List[int]
     parametros_ids: List[int]
     referentes_ids: List[int]
+    activo: bool = True
 
 
 @dataclass

@@ -20,13 +20,22 @@ from src.infrastructure.repositories.sqlite_resultado_ejecucion_repository impor
 from src.domain.services.usuario_service import UsuarioService
 from src.domain.services.control_service import ControlService
 from src.domain.services.ejecucion_control_service import EjecucionControlService
+from src.domain.services.conexion_test_service import ConexionTestFactory
+from src.infrastructure.services.postgresql_conexion_test import PostgreSQLConexionTest
+from src.infrastructure.services.mysql_conexion_test import MySQLConexionTest
+from src.infrastructure.services.sqlserver_conexion_test import SQLServerConexionTest
+from src.infrastructure.services.sqlite_conexion_test import SQLiteConexionTest
 
 from src.application.use_cases.registrar_usuario_use_case import RegistrarUsuarioUseCase
 from src.application.use_cases.crear_control_use_case import CrearControlUseCase
+from src.application.use_cases.actualizar_control_use_case import ActualizarControlUseCase
+from src.application.use_cases.eliminar_control_use_case import EliminarControlUseCase
 from src.application.use_cases.listar_controles_use_case import ListarControlesUseCase
 from src.application.use_cases.crear_parametro_use_case import CrearParametroUseCase
 from src.application.use_cases.crear_consulta_use_case import CrearConsultaUseCase
 from src.application.use_cases.crear_conexion_use_case import CrearConexionUseCase
+from src.application.use_cases.actualizar_conexion_use_case import ActualizarConexionUseCase
+from src.application.use_cases.listar_conexiones_use_case import ListarConexionesUseCase
 from src.application.use_cases.crear_referente_use_case import CrearReferenteUseCase
 from src.application.use_cases.ejecutar_control_use_case import EjecutarControlUseCase
 from src.application.use_cases.obtener_historial_ejecucion_use_case import ObtenerHistorialEjecucionUseCase
@@ -39,7 +48,7 @@ from src.presentation.controllers.conexion_controller import ConexionController
 from src.presentation.controllers.referente_controller import ReferenteController
 from src.presentation.controllers.ejecucion_controller import EjecucionController
 
-from src.presentation.gui.dialogs import CreateConnectionDialog, CreateControlDialog, ExecutionParametersDialog
+from src.presentation.gui.dialogs import CreateConnectionDialog, EditConnectionDialog, CreateControlDialog, EditControlDialog, ExecutionParametersDialog
 
 
 class MainWindow:
@@ -50,8 +59,13 @@ class MainWindow:
         self.root.title("Sistema de Gestión de Controles SQL")
         self.root.geometry("1200x800")
         
-        # Configurar base de datos
-        self.db_path = "controles_gui.db"
+        # Configurar base de datos centralizada
+        self.db_path = "sistema_controles.db"
+        
+        # Inicializar servicios de conexión
+        from src.infrastructure.config.conexion_config import inicializar_servicios_conexion
+        inicializar_servicios_conexion()
+        
         self.setup_controllers()
         
         # Crear interfaz
@@ -59,6 +73,9 @@ class MainWindow:
         
     def setup_controllers(self):
         """Configura todos los controladores siguiendo Clean Architecture"""
+        # Inicializar servicios de prueba de conexión
+        self._inicializar_servicios_conexion()
+        
         # Repositorios
         usuario_repo = SQLiteUsuarioRepository(self.db_path)
         conexion_repo = SQLiteConexionRepository(self.db_path)
@@ -70,7 +87,7 @@ class MainWindow:
         
         # Servicios
         usuario_service = UsuarioService(usuario_repo)
-        control_service = ControlService(
+        self.control_service = ControlService(
             control_repo, consulta_repo, conexion_repo, parametro_repo, referente_repo
         )
         ejecucion_service = EjecucionControlService(
@@ -80,8 +97,12 @@ class MainWindow:
         # Casos de uso
         registrar_usuario_uc = RegistrarUsuarioUseCase(usuario_repo, usuario_service)
         crear_conexion_uc = CrearConexionUseCase(conexion_repo)
-        crear_control_uc = CrearControlUseCase(control_service)
-        listar_controles_uc = ListarControlesUseCase(control_service)
+        actualizar_conexion_uc = ActualizarConexionUseCase(conexion_repo)
+        listar_conexiones_uc = ListarConexionesUseCase(conexion_repo)
+        crear_control_uc = CrearControlUseCase(self.control_service)
+        actualizar_control_uc = ActualizarControlUseCase(self.control_service, control_repo)
+        eliminar_control_uc = EliminarControlUseCase(self.control_service, control_repo)
+        listar_controles_uc = ListarControlesUseCase(self.control_service)
         crear_parametro_uc = CrearParametroUseCase(parametro_repo)
         crear_consulta_uc = CrearConsultaUseCase(consulta_repo)
         crear_referente_uc = CrearReferenteUseCase(referente_repo)
@@ -90,8 +111,8 @@ class MainWindow:
         
         # Controladores
         self.usuario_ctrl = UsuarioController(registrar_usuario_uc)
-        self.conexion_ctrl = ConexionController(crear_conexion_uc)
-        self.control_ctrl = ControlController(crear_control_uc, listar_controles_uc)
+        self.conexion_ctrl = ConexionController(crear_conexion_uc, listar_conexiones_uc, actualizar_conexion_uc)
+        self.control_ctrl = ControlController(crear_control_uc, listar_controles_uc, actualizar_control_uc, eliminar_control_uc)
         self.parametro_ctrl = ParametroController(crear_parametro_uc)
         self.consulta_ctrl = ConsultaController(crear_consulta_uc)
         self.referente_ctrl = ReferenteController(crear_referente_uc)
@@ -297,7 +318,7 @@ class MainWindow:
         
         try:
             # Obtener controles desde el controlador
-            response = self.control_ctrl.obtener_todos()
+            response = self.control_ctrl.obtener_todas()
             if response.get('success', False):
                 controles = response.get('data', [])
                 for control in controles:
@@ -331,9 +352,11 @@ class MainWindow:
                     self.connections_tree.insert("", "end", values=(
                         conexion.get('id', ''),
                         conexion.get('nombre', ''),
+                        conexion.get('motor', ''),
                         conexion.get('servidor', ''),
+                        conexion.get('puerto', ''),
                         conexion.get('base_datos', ''),
-                        conexion.get('tipo_motor', ''),
+                        conexion.get('usuario', ''),
                         "Activa" if conexion.get('activa', False) else "Inactiva"
                     ))
         except Exception as e:
@@ -347,7 +370,7 @@ class MainWindow:
         
         try:
             # Obtener solo controles activos
-            response = self.control_ctrl.obtener_todos()
+            response = self.control_ctrl.obtener_todas()
             if response.get('success', False):
                 controles = response.get('data', [])
                 for control in controles:
@@ -400,7 +423,59 @@ class MainWindow:
         if not selection:
             messagebox.showwarning("Advertencia", "Selecciona un control para editar")
             return
-        messagebox.showinfo("Función", "Editar control - Por implementar")
+        
+        # Obtener datos del control seleccionado
+        item = self.controls_tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            messagebox.showerror("Error", "No se pudieron obtener los datos del control")
+            return
+        
+        control_id = values[0]
+        
+        # Obtener los datos completos del control desde el backend
+        try:
+            # Usar el servicio para cargar el control completo
+            control_completo = self.control_service.cargar_control_completo(control_id)
+            
+            # Crear diccionario con los datos completos del control
+            control_data = {
+                'id': control_completo.id,
+                'nombre': control_completo.nombre,
+                'descripcion': control_completo.descripcion,
+                'activo': control_completo.activo,
+                'fecha_creacion': control_completo.fecha_creacion.isoformat() if control_completo.fecha_creacion else '',
+                'disparar_si_hay_datos': control_completo.disparar_si_hay_datos,
+                'conexion_id': control_completo.conexion_id
+            }
+            
+        except Exception as e:
+            # Fallback: usar datos básicos del TreeView
+            control_data = {
+                'id': values[0],
+                'nombre': values[1],
+                'descripcion': values[2],
+                'activo': values[4] == "Activo",
+                'fecha_creacion': values[5],
+                'disparar_si_hay_datos': True,  # Por defecto como fallback
+                'conexion_id': None
+            }
+        
+        # Abrir diálogo de edición
+        dialog = EditControlDialog(
+            self.root, 
+            self.control_ctrl, 
+            self.conexion_ctrl,
+            control_data
+        )
+        
+        # Esperar a que se cierre el diálogo
+        self.root.wait_window(dialog.dialog)
+        
+        # Si se editó exitosamente, actualizar la lista
+        if dialog.result:
+            self.refresh_controls()
     
     def delete_control(self):
         """Elimina el control seleccionado"""
@@ -408,8 +483,42 @@ class MainWindow:
         if not selection:
             messagebox.showwarning("Advertencia", "Selecciona un control para eliminar")
             return
-        if messagebox.askyesno("Confirmar", "¿Estás seguro de eliminar este control?"):
-            messagebox.showinfo("Función", "Eliminar control - Por implementar")
+        
+        # Obtener datos del control seleccionado
+        item = self.controls_tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            messagebox.showerror("Error", "No se pudieron obtener los datos del control")
+            return
+        
+        control_id = values[0]
+        control_nombre = values[1]
+        
+        # Confirmar eliminación
+        resultado = messagebox.askyesno(
+            "Confirmar eliminación", 
+            f"¿Estás seguro de que deseas eliminar el control '{control_nombre}'?\n\n"
+            f"Esta acción no se puede deshacer.",
+            icon='warning'
+        )
+        
+        if not resultado:
+            return
+        
+        try:
+            # Ejecutar eliminación
+            response = self.control_ctrl.eliminar_control(control_id)
+            
+            if response.get('success', False):
+                messagebox.showinfo("Éxito", response.get('message', 'Control eliminado exitosamente'))
+                # Actualizar la lista de controles
+                self.refresh_controls()
+            else:
+                messagebox.showerror("Error", response.get('error', 'Error desconocido al eliminar el control'))
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error inesperado: {str(e)}")
     
     def new_connection(self):
         """Abre ventana para crear nueva conexión"""
@@ -422,7 +531,45 @@ class MainWindow:
     
     def edit_connection(self):
         """Edita la conexión seleccionada"""
-        messagebox.showinfo("Función", "Editar conexión - Por implementar")
+        selection = self.connections_tree.selection()
+        if not selection:
+            messagebox.showwarning("Advertencia", "Selecciona una conexión para editar")
+            return
+        
+        # Obtener datos de la conexión seleccionada
+        item = self.connections_tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            messagebox.showerror("Error", "No se pudieron obtener los datos de la conexión")
+            return
+        
+        # Crear diccionario con los datos de la conexión
+        conexion_data = {
+            'id': values[0],
+            'nombre': values[1],
+            'motor': values[2],
+            'servidor': values[3],
+            'puerto': values[4],
+            'base_datos': values[5],
+            'usuario': values[6],
+            'activa': values[7] == "Activa",  # Convertir texto a booleano
+            # No incluimos la contraseña por seguridad
+        }
+        
+        # Abrir diálogo de edición
+        dialog = EditConnectionDialog(
+            self.root, 
+            self.conexion_ctrl, 
+            conexion_data
+        )
+        
+        # Esperar a que se cierre el diálogo
+        self.root.wait_window(dialog.dialog)
+        
+        # Si se editó exitosamente, actualizar la lista
+        if dialog.result:
+            self.refresh_connections()
     
     def test_connection(self):
         """Prueba la conexión seleccionada"""
@@ -543,6 +690,38 @@ class MainWindow:
             "Interface: Tkinter\n\n"
             "Desarrollado para entornos bancarios"
         )
+    
+    def _inicializar_servicios_conexion(self):
+        """Inicializa y registra los servicios de prueba de conexión"""
+        # Registrar servicio PostgreSQL
+        postgresql_service = PostgreSQLConexionTest()
+        ConexionTestFactory.registrar_servicio(
+            postgresql_service.tipos_soportados(), 
+            postgresql_service
+        )
+        
+        # Registrar servicio MySQL
+        mysql_service = MySQLConexionTest()
+        ConexionTestFactory.registrar_servicio(
+            mysql_service.tipos_soportados(), 
+            mysql_service
+        )
+        
+        # Registrar servicio SQL Server
+        sqlserver_service = SQLServerConexionTest()
+        ConexionTestFactory.registrar_servicio(
+            sqlserver_service.tipos_soportados(), 
+            sqlserver_service
+        )
+        
+        # Registrar servicio SQLite
+        sqlite_service = SQLiteConexionTest()
+        ConexionTestFactory.registrar_servicio(
+            sqlite_service.tipos_soportados(), 
+            sqlite_service
+        )
+        
+        print(f"✅ Servicios de conexión registrados: {ConexionTestFactory.tipos_soportados()}")
     
     def run(self):
         """Inicia la aplicación"""
