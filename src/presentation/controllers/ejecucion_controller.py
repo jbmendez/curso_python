@@ -28,18 +28,14 @@ class EjecucionController:
     def ejecutar_control(
         self,
         control_id: int,
-        parametros_adicionales: dict = None,
-        ejecutar_solo_disparo: bool = False,
-        mock_execution: bool = False
+        ejecutar_solo_disparo: bool = False
     ) -> dict:
         """
         Ejecuta un control específico
         
         Args:
             control_id: ID del control a ejecutar
-            parametros_adicionales: Parámetros adicionales para la ejecución
             ejecutar_solo_disparo: Si True, solo ejecuta la consulta de disparo
-            mock_execution: Si True, simula la ejecución (para testing)
             
         Returns:
             dict: Resultado de la ejecución en formato JSON
@@ -47,9 +43,9 @@ class EjecucionController:
         try:
             dto = EjecutarControlDTO(
                 control_id=control_id,
-                parametros_adicionales=parametros_adicionales,
+                parametros_adicionales=None,  # No implementado
                 ejecutar_solo_disparo=ejecutar_solo_disparo,
-                mock_execution=mock_execution
+                mock_execution=False  # No implementado
             )
             
             resultado = self.ejecutar_use_case.ejecutar(dto)

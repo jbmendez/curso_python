@@ -1392,11 +1392,8 @@ Mensaje: {mensaje}"""
         
         # Abrir diálogo de parámetros
         # TODO: Cargar parámetros reales del control
-        parametros_ejemplo = [
-            {'nombre': 'umbral_ventas', 'valor_por_defecto': 10000, 'descripcion': 'Umbral máximo de ventas'}
-        ]
-        
-        dialog = ExecutionParametersDialog(self.root, parametros_ejemplo)
+        # Crear diálogo simple solo con opciones básicas
+        dialog = ExecutionParametersDialog(self.root, [])  # Sin parámetros adicionales
         self.root.wait_window(dialog.dialog)
         
         if not dialog.result:
@@ -1411,9 +1408,7 @@ Mensaje: {mensaje}"""
         try:
             response = self.ejecucion_ctrl.ejecutar_control(
                 control_id=int(config['control_id']),
-                parametros_adicionales=config['parametros'],
-                ejecutar_solo_disparo=config['ejecutar_solo_disparo'],
-                mock_execution=config['mock_execution']
+                ejecutar_solo_disparo=config['ejecutar_solo_disparo']
             )
             
             if response.get('success', False):
@@ -1449,8 +1444,7 @@ Mensaje: {mensaje}"""
         try:
             response = self.ejecucion_ctrl.ejecutar_control(
                 control_id=int(control_id),
-                ejecutar_solo_disparo=True,
-                mock_execution=False  # Ejecutar realmente, no simular
+                ejecutar_solo_disparo=True
             )
             
             if response.get('success', False):

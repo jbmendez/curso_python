@@ -749,7 +749,7 @@ class ExecutionParametersDialog:
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Parámetros de Ejecución")
-        self.dialog.geometry("500x400")
+        self.dialog.geometry("400x250")
         self.dialog.grab_set()
         
         self.create_widgets()
@@ -773,40 +773,9 @@ class ExecutionParametersDialog:
         options_frame = ttk.LabelFrame(main_frame, text="Opciones de Ejecución")
         options_frame.pack(fill="x", pady=10)
         
-        self.solo_disparo_var = tk.BooleanVar(value=True)
+        self.solo_disparo_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(options_frame, text="Ejecutar solo consultas de disparo", 
                        variable=self.solo_disparo_var).pack(anchor="w", padx=10, pady=5)
-        
-        self.mock_execution_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(options_frame, text="Ejecución simulada (mock)", 
-                       variable=self.mock_execution_var).pack(anchor="w", padx=10, pady=5)
-        
-        # Parámetros adicionales
-        params_frame = ttk.LabelFrame(main_frame, text="Parámetros Adicionales")
-        params_frame.pack(fill="both", expand=True, pady=10)
-        
-        # Crear campos para parámetros
-        self.param_vars = {}
-        if self.parametros:
-            for i, param in enumerate(self.parametros):
-                param_row = ttk.Frame(params_frame)
-                param_row.pack(fill="x", padx=10, pady=2)
-                
-                ttk.Label(param_row, text=f"{param.get('nombre', '')}:").pack(side="left", anchor="w")
-                
-                var = tk.StringVar(value=str(param.get('valor_por_defecto', '')))
-                self.param_vars[param.get('nombre', '')] = var
-                
-                ttk.Entry(param_row, textvariable=var, width=20).pack(side="right")
-                
-                # Descripción
-                if param.get('descripcion'):
-                    desc_label = ttk.Label(param_row, text=param['descripcion'], 
-                                         font=("Arial", 8), foreground="gray")
-                    desc_label.pack(side="right", padx=(0, 10))
-        else:
-            ttk.Label(params_frame, text="No se requieren parámetros adicionales", 
-                     foreground="gray").pack(padx=10, pady=10)
         
         # Botones
         buttons_frame = ttk.Frame(main_frame)
@@ -818,25 +787,9 @@ class ExecutionParametersDialog:
     def execute(self):
         """Ejecuta con parámetros configurados"""
         try:
-            # Recopilar parámetros adicionales
-            parametros_adicionales = {}
-            for nombre, var in self.param_vars.items():
-                valor = var.get().strip()
-                if valor:
-                    # Intentar convertir a número si es posible
-                    try:
-                        if '.' in valor:
-                            parametros_adicionales[nombre] = float(valor)
-                        else:
-                            parametros_adicionales[nombre] = int(valor)
-                    except ValueError:
-                        parametros_adicionales[nombre] = valor
-            
             self.result = {
                 'control_id': self.control_id_var.get(),
-                'ejecutar_solo_disparo': self.solo_disparo_var.get(),
-                'mock_execution': self.mock_execution_var.get(),
-                'parametros': parametros_adicionales
+                'ejecutar_solo_disparo': self.solo_disparo_var.get()
             }
             
             self.dialog.destroy()
