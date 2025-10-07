@@ -26,6 +26,8 @@ from src.domain.repositories.consulta_repository import ConsultaRepository
 from src.domain.repositories.referente_repository import ReferenteRepository
 from src.domain.repositories.consulta_control_repository import ConsultaControlRepository
 from src.domain.repositories.conexion_repository import ConexionRepository
+from src.domain.repositories.control_referente_repository import ControlReferenteRepository
+from src.domain.services.excel_generator_service import ExcelGeneratorService
 
 
 class EjecucionControlService:
@@ -38,7 +40,8 @@ class EjecucionControlService:
         consulta_repository: ConsultaRepository,
         referente_repository: ReferenteRepository,
         conexion_repository: ConexionRepository,
-        consulta_control_repository: ConsultaControlRepository
+        consulta_control_repository: ConsultaControlRepository,
+        control_referente_repository: ControlReferenteRepository
     ):
         self._control_repository = control_repository
         self._parametro_repository = parametro_repository
@@ -46,6 +49,8 @@ class EjecucionControlService:
         self._referente_repository = referente_repository
         self._conexion_repository = conexion_repository
         self._consulta_control_repository = consulta_control_repository
+        self._control_referente_repository = control_referente_repository
+        self._excel_generator = ExcelGeneratorService()
     
     def _es_consulta_lectura(self, sql: str) -> bool:
         """Determina si una consulta SQL es de lectura (devuelve datos)"""
@@ -184,7 +189,8 @@ class EjecucionControlService:
             
             tiempo_total = (time.time() - inicio_tiempo) * 1000  # en millisegundos
             
-            return ResultadoEjecucion(
+            # Crear resultado de ejecución
+            resultado_ejecucion = ResultadoEjecucion(
                 id=None,
                 control_id=control.id,
                 control_nombre=control.nombre,
@@ -200,6 +206,16 @@ class EjecucionControlService:
                 conexion_id=conexion.id,
                 conexion_nombre=conexion.nombre
             )
+            
+            # Generar archivos Excel para referentes que lo requieran
+            print(f"DEBUG EXCEL - Estado: {estado}, Solo disparo: {ejecutar_solo_disparo}")
+            if not ejecutar_solo_disparo and (estado == EstadoEjecucion.EXITOSO or estado == EstadoEjecucion.CONTROL_DISPARADO):
+                print(f"DEBUG EXCEL - Iniciando generación de Excel para control {control.nombre}")
+                self._generar_archivos_excel(control, resultado_ejecucion)
+            else:
+                print(f"DEBUG EXCEL - No se genera Excel: solo_disparo={ejecutar_solo_disparo}, estado={estado}")
+            
+            return resultado_ejecucion
             
         except Exception as e:
             tiempo_total = (time.time() - inicio_tiempo) * 1000
@@ -888,3 +904,74 @@ class EjecucionControlService:
                 tiempo_ejecucion_ms=tiempo_ejecucion,
                 error=f"Error SQL Server: {str(e)}"
             )
+    
+    def _generar_archivos_excel(self, control: Control, resultado_ejecucion: ResultadoEjecucion):
+        """
+        Genera archivos Excel para los referentes que tienen configurada la notificación por archivo
+        
+        Args:
+            control: Control ejecutado
+            resultado_ejecucion: Resultado de la ejecución del control
+        """
+        print(f"DEBUG EXCEL - Entrando en _generar_archivos_excel para control {control.nombre}")
+        try:
+            # Obtener asociaciones de referentes que requieren archivo
+            asociaciones = self._control_referente_repository.obtener_por_control(control.id)
+            print(f"DEBUG EXCEL - Encontradas {len(asociaciones)} asociaciones totales")
+            
+            referentes_archivo = [
+                asoc for asoc in asociaciones 
+                if asoc.activa and asoc.notificar_por_archivo
+            ]
+            print(f"DEBUG EXCEL - Referentes con archivo habilitado: {len(referentes_archivo)}")
+            
+            if not referentes_archivo:
+                print(f"DEBUG EXCEL - No hay referentes configurados para generar archivo en control {control.nombre}")
+                return
+            
+            # Preparar datos de consultas para Excel
+            consultas_resultados = []
+            
+            # Agregar resultado de consulta de disparo si tiene datos
+            if (resultado_ejecucion.resultado_consulta_disparo and 
+                resultado_ejecucion.resultado_consulta_disparo.datos):
+                consultas_resultados.append({
+                    'nombre': f"{resultado_ejecucion.resultado_consulta_disparo.consulta_nombre} (Disparo)",
+                    'datos': resultado_ejecucion.resultado_consulta_disparo.datos
+                })
+            
+            # Agregar resultados de consultas disparadas con datos
+            for resultado_consulta in resultado_ejecucion.resultados_consultas_disparadas:
+                if resultado_consulta.datos:
+                    consultas_resultados.append({
+                        'nombre': resultado_consulta.consulta_nombre,
+                        'datos': resultado_consulta.datos
+                    })
+            
+            # Si no hay datos para mostrar en Excel, no generar archivo
+            if not consultas_resultados:
+                print(f"DEBUG - No hay datos para generar Excel en control {control.nombre}")
+                return
+            
+            # Generar archivo para cada referente
+            for asociacion in referentes_archivo:
+                referente = self._referente_repository.obtener_por_id(asociacion.referente_id)
+                if not referente or not referente.path_archivos:
+                    print(f"DEBUG - Referente {asociacion.referente_id} no encontrado o sin path_archivos")
+                    continue
+                
+                try:
+                    archivo_generado = self._excel_generator.generar_excel_control(
+                        control_nombre=control.nombre,
+                        consultas_resultados=consultas_resultados,
+                        referente_path=referente.path_archivos,
+                        fecha_ejecucion=resultado_ejecucion.fecha_ejecucion
+                    )
+                    
+                    print(f"DEBUG - Archivo Excel generado para referente {referente.nombre}: {archivo_generado}")
+                    
+                except Exception as e:
+                    print(f"ERROR - No se pudo generar Excel para referente {referente.nombre}: {str(e)}")
+                    
+        except Exception as e:
+            print(f"ERROR - Error general generando archivos Excel: {str(e)}")

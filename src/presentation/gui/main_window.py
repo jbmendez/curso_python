@@ -111,7 +111,7 @@ class MainWindow:
             control_repo, consulta_repo, conexion_repo, parametro_repo, referente_repo
         )
         ejecucion_service = EjecucionControlService(
-            control_repo, parametro_repo, consulta_repo, referente_repo, conexion_repo, consulta_control_repo
+            control_repo, parametro_repo, consulta_repo, referente_repo, conexion_repo, consulta_control_repo, control_referente_repo
         )
         
         # Casos de uso
