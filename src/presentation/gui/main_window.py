@@ -1218,13 +1218,16 @@ Mensaje: {mensaje}"""
             {'nombre': 'umbral_ventas', 'valor_por_defecto': 10000, 'descripcion': 'Umbral máximo de ventas'}
         ]
         
-        dialog = ExecutionParametersDialog(self.root, control_id, control_nombre, parametros_ejemplo)
+        dialog = ExecutionParametersDialog(self.root, parametros_ejemplo)
         self.root.wait_window(dialog.dialog)
         
         if not dialog.result:
             return  # Usuario canceló
         
         config = dialog.result
+        # Usar el control_id real en lugar del del config
+        config['control_id'] = control_id
+        
         self.results_text.insert("end", f"\n=== Ejecutando Control: {control_nombre} ===\n")
         
         try:
@@ -1269,7 +1272,7 @@ Mensaje: {mensaje}"""
             response = self.ejecucion_ctrl.ejecutar_control(
                 control_id=int(control_id),
                 ejecutar_solo_disparo=True,
-                mock_execution=True
+                mock_execution=False  # Ejecutar realmente, no simular
             )
             
             if response.get('success', False):

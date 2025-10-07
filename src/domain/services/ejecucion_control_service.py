@@ -206,7 +206,7 @@ class EjecucionControlService:
         self,
         consulta: Consulta,
         parametros: Dict[str, Any],
-        conexion: Conexion,
+        conexion_control: Conexion,
         mock_execution: bool = False,
         es_disparo: bool = False
     ) -> ResultadoConsulta:
@@ -214,12 +214,26 @@ class EjecucionControlService:
         inicio = time.time()
         
         try:
+            # Determinar qué conexión usar: la específica de la consulta o la del control
+            conexion_a_usar = conexion_control
+            
+            if consulta.conexion_id is not None:
+                # La consulta tiene una conexión específica, usarla
+                conexion_especifica = self._conexion_repository.obtener_por_id(consulta.conexion_id)
+                if conexion_especifica:
+                    conexion_a_usar = conexion_especifica
+                    print(f"DEBUG: Usando conexión específica de consulta '{consulta.nombre}': {conexion_especifica.nombre} (ID: {conexion_especifica.id})")
+                else:
+                    print(f"WARNING: Consulta '{consulta.nombre}' especifica conexión_id={consulta.conexion_id} pero no se encontró, usando conexión del control")
+            else:
+                print(f"DEBUG: Consulta '{consulta.nombre}' sin conexión específica, usando conexión del control: {conexion_control.nombre} (ID: {conexion_control.id})")
+            
             if mock_execution:
                 # Simular ejecución para demo/testing
                 return self._simular_ejecucion_consulta(consulta, parametros, es_disparo)
             else:
                 # Ejecución real de la consulta SQL
-                return self._ejecutar_consulta_real(consulta, parametros, conexion, es_disparo)
+                return self._ejecutar_consulta_real(consulta, parametros, conexion_a_usar, es_disparo)
                 
         except Exception as e:
             tiempo_ejecucion = (time.time() - inicio) * 1000
