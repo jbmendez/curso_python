@@ -35,8 +35,18 @@ class ConsultaRepository(ABC):
         pass
     
     @abstractmethod
+    def obtener_por_control(self, control_id: int) -> List[Consulta]:
+        """Obtiene todas las consultas de un control específico"""
+        pass
+    
+    @abstractmethod
     def guardar(self, consulta: Consulta) -> Consulta:
         """Guarda una consulta (crear o actualizar)"""
+        pass
+    
+    @abstractmethod
+    def actualizar(self, consulta: Consulta) -> Consulta:
+        """Actualiza una consulta existente"""
         pass
     
     @abstractmethod

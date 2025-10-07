@@ -13,6 +13,7 @@ from src.infrastructure.repositories.sqlite_usuario_repository import SQLiteUsua
 from src.infrastructure.repositories.sqlite_control_repository import SQLiteControlRepository
 from src.infrastructure.repositories.sqlite_parametro_repository import SQLiteParametroRepository
 from src.infrastructure.repositories.sqlite_consulta_repository import SQLiteConsultaRepository
+from src.infrastructure.repositories.sqlite_consulta_control_repository import SQLiteConsultaControlRepository
 from src.infrastructure.repositories.sqlite_conexion_repository import SQLiteConexionRepository
 from src.infrastructure.repositories.sqlite_referente_repository import SQLiteReferenteRepository
 from src.infrastructure.repositories.sqlite_resultado_ejecucion_repository import SQLiteResultadoEjecucionRepository
@@ -36,6 +37,13 @@ from src.application.use_cases.eliminar_control_use_case import EliminarControlU
 from src.application.use_cases.listar_controles_use_case import ListarControlesUseCase
 from src.application.use_cases.crear_parametro_use_case import CrearParametroUseCase
 from src.application.use_cases.crear_consulta_use_case import CrearConsultaUseCase
+from src.application.use_cases.listar_consultas_use_case import ListarConsultasUseCase
+from src.application.use_cases.actualizar_consulta_use_case import ActualizarConsultaUseCase
+from src.application.use_cases.eliminar_consulta_use_case import EliminarConsultaUseCase
+from src.application.use_cases.asociar_consulta_control_use_case import AsociarConsultaControlUseCase
+from src.application.use_cases.listar_consulta_control_use_case import ListarConsultaControlUseCase
+from src.application.use_cases.desasociar_consulta_control_use_case import DesasociarConsultaControlUseCase
+from src.application.use_cases.establecer_consulta_disparo_use_case import EstablecerConsultaDisparoUseCase
 from src.application.use_cases.crear_conexion_use_case import CrearConexionUseCase
 from src.application.use_cases.actualizar_conexion_use_case import ActualizarConexionUseCase
 from src.application.use_cases.listar_conexiones_use_case import ListarConexionesUseCase
@@ -47,6 +55,7 @@ from src.presentation.controllers.usuario_controller import UsuarioController
 from src.presentation.controllers.control_controller import ControlController
 from src.presentation.controllers.parametro_controller import ParametroController
 from src.presentation.controllers.consulta_controller import ConsultaController
+from src.presentation.controllers.consulta_control_controller import ConsultaControlController
 from src.presentation.controllers.conexion_controller import ConexionController
 from src.presentation.controllers.referente_controller import ReferenteController
 from src.presentation.controllers.ejecucion_controller import EjecucionController
@@ -85,6 +94,7 @@ class MainWindow:
         control_repo = SQLiteControlRepository(self.db_path)
         parametro_repo = SQLiteParametroRepository(self.db_path)
         consulta_repo = SQLiteConsultaRepository(self.db_path)
+        consulta_control_repo = SQLiteConsultaControlRepository(self.db_path)
         referente_repo = SQLiteReferenteRepository(self.db_path)
         resultado_repo = SQLiteResultadoEjecucionRepository(self.db_path)
         
@@ -94,7 +104,7 @@ class MainWindow:
             control_repo, consulta_repo, conexion_repo, parametro_repo, referente_repo
         )
         ejecucion_service = EjecucionControlService(
-            control_repo, parametro_repo, consulta_repo, referente_repo, conexion_repo
+            control_repo, parametro_repo, consulta_repo, referente_repo, conexion_repo, consulta_control_repo
         )
         
         # Casos de uso
@@ -108,6 +118,14 @@ class MainWindow:
         listar_controles_uc = ListarControlesUseCase(self.control_service)
         crear_parametro_uc = CrearParametroUseCase(parametro_repo)
         crear_consulta_uc = CrearConsultaUseCase(consulta_repo)
+        listar_consultas_uc = ListarConsultasUseCase(consulta_repo)
+        actualizar_consulta_uc = ActualizarConsultaUseCase(consulta_repo)
+        eliminar_consulta_uc = EliminarConsultaUseCase(consulta_repo)
+        # Use cases de asociaciones consulta-control
+        asociar_consulta_control_uc = AsociarConsultaControlUseCase(consulta_control_repo)
+        listar_consulta_control_uc = ListarConsultaControlUseCase(consulta_control_repo)
+        desasociar_consulta_control_uc = DesasociarConsultaControlUseCase(consulta_control_repo)
+        establecer_consulta_disparo_uc = EstablecerConsultaDisparoUseCase(consulta_control_repo)
         crear_referente_uc = CrearReferenteUseCase(referente_repo)
         ejecutar_control_uc = EjecutarControlUseCase(control_repo, conexion_repo, resultado_repo, ejecucion_service)
         historial_uc = ObtenerHistorialEjecucionUseCase(resultado_repo, control_repo)
@@ -117,7 +135,11 @@ class MainWindow:
         self.conexion_ctrl = ConexionController(crear_conexion_uc, listar_conexiones_uc, actualizar_conexion_uc)
         self.control_ctrl = ControlController(crear_control_uc, listar_controles_uc, actualizar_control_uc, eliminar_control_uc)
         self.parametro_ctrl = ParametroController(crear_parametro_uc)
-        self.consulta_ctrl = ConsultaController(crear_consulta_uc)
+        self.consulta_ctrl = ConsultaController(crear_consulta_uc, listar_consultas_uc, actualizar_consulta_uc, eliminar_consulta_uc)
+        self.consulta_control_ctrl = ConsultaControlController(
+            asociar_consulta_control_uc, listar_consulta_control_uc, 
+            desasociar_consulta_control_uc, establecer_consulta_disparo_uc
+        )
         self.referente_ctrl = ReferenteController(crear_referente_uc)
         self.ejecucion_ctrl = EjecucionController(ejecutar_control_uc, historial_uc)
         
@@ -135,6 +157,9 @@ class MainWindow:
         
         # Pestaña de conexiones
         self.create_connections_tab(notebook)
+        
+        # Pestaña de consultas
+        self.create_consultas_tab(notebook)
         
         # Pestaña de ejecución
         self.create_execution_tab(notebook)
@@ -177,6 +202,7 @@ class MainWindow:
         
         ttk.Button(buttons_frame, text="Nuevo Control", command=self.new_control).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Editar Control", command=self.edit_control).pack(side="left", padx=5)
+        ttk.Button(buttons_frame, text="Gestionar Consultas", command=self.manage_control_consultas).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Eliminar Control", command=self.delete_control).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Actualizar", command=self.refresh_controls).pack(side="left", padx=5)
         
@@ -233,6 +259,41 @@ class MainWindow:
         
         # Cargar conexiones iniciales
         self.refresh_connections()
+        
+    def create_consultas_tab(self, notebook):
+        """Crea la pestaña de gestión de consultas"""
+        consultas_frame = ttk.Frame(notebook)
+        notebook.add(consultas_frame, text="Consultas")
+        
+        # Frame superior para botones
+        buttons_frame = ttk.Frame(consultas_frame)
+        buttons_frame.pack(fill="x", padx=5, pady=5)
+        
+        ttk.Button(buttons_frame, text="Nueva Consulta", command=self.new_consulta).pack(side="left", padx=5)
+        ttk.Button(buttons_frame, text="Editar Consulta", command=self.edit_consulta).pack(side="left", padx=5)
+        ttk.Button(buttons_frame, text="Eliminar Consulta", command=self.delete_consulta).pack(side="left", padx=5)
+        ttk.Button(buttons_frame, text="Ejecutar Consulta", command=self.execute_consulta).pack(side="left", padx=5)
+        ttk.Button(buttons_frame, text="Actualizar", command=self.refresh_consultas).pack(side="left", padx=5)
+        
+        # Lista de consultas
+        columns = ("ID", "Nombre", "Descripción", "Conexión", "Control", "Fecha Creación")
+        self.consultas_tree = ttk.Treeview(consultas_frame, columns=columns, show="headings", height=15)
+        
+        # Configurar columnas
+        for col in columns:
+            self.consultas_tree.heading(col, text=col)
+            self.consultas_tree.column(col, width=130)
+        
+        # Scrollbar para la lista
+        scrollbar_consultas = ttk.Scrollbar(consultas_frame, orient="vertical", command=self.consultas_tree.yview)
+        self.consultas_tree.configure(yscrollcommand=scrollbar_consultas.set)
+        
+        # Empaquetar lista y scrollbar
+        self.consultas_tree.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        scrollbar_consultas.pack(side="right", fill="y")
+        
+        # Cargar consultas iniciales
+        self.refresh_consultas()
         
     def create_execution_tab(self, notebook):
         """Crea la pestaña de ejecución de controles"""
@@ -545,6 +606,42 @@ class MainWindow:
         except Exception as e:
             messagebox.showerror("Error", f"Error inesperado: {str(e)}")
     
+    def manage_control_consultas(self):
+        """Gestiona las consultas asociadas a un control"""
+        selection = self.controls_tree.selection()
+        if not selection:
+            messagebox.showwarning("Advertencia", "Selecciona un control para gestionar sus consultas")
+            return
+        
+        # Obtener datos del control seleccionado
+        item = self.controls_tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            messagebox.showerror("Error", "No se pudieron obtener los datos del control")
+            return
+        
+        control_id = values[0]
+        control_nombre = values[1]
+        
+        # Abrir diálogo de gestión de consultas
+        from .control_consultas_dialog import ControlConsultasDialog
+        
+        dialog = ControlConsultasDialog(
+            self.root,
+            control_id,
+            control_nombre,
+            self.consulta_ctrl,
+            self.consulta_control_ctrl
+        )
+        
+        # Esperar a que se cierre el diálogo
+        self.root.wait_window(dialog.dialog)
+        
+        # Si hubo cambios, actualizar la vista si es necesario
+        if dialog.result:
+            self.refresh_controls()
+    
     def new_connection(self):
         """Abre ventana para crear nueva conexión"""
         dialog = CreateConnectionDialog(self.root, self.conexion_ctrl)
@@ -717,6 +814,392 @@ Mensaje: {mensaje}"""
                 pass
             
             messagebox.showerror("Error", f"Error al probar la conexión: {str(e)}")
+    
+    # Métodos para gestión de consultas
+    def refresh_consultas(self):
+        """Actualiza la lista de consultas"""
+        try:
+            response = self.consulta_ctrl.obtener_todas()
+            
+            # Limpiar lista actual
+            for item in self.consultas_tree.get_children():
+                self.consultas_tree.delete(item)
+            
+            if response.get('success', False):
+                for consulta in response.get('data', []):
+                    # Obtener nombres de conexión y control
+                    conexion_nombre = "Sin conexión"
+                    if consulta.get('conexion_id'):
+                        try:
+                            conn_response = self.conexion_ctrl.obtener_por_id(consulta['conexion_id'])
+                            if conn_response.get('success', False):
+                                conexion_nombre = conn_response['data'].get('nombre', 'N/A')
+                        except:
+                            pass
+                    
+                    control_nombre = "Sin control"
+                    if consulta.get('control_id'):
+                        try:
+                            ctrl_response = self.control_ctrl.obtener_por_id(consulta['control_id'])
+                            if ctrl_response.get('success', False):
+                                control_nombre = ctrl_response['data'].get('nombre', 'N/A')
+                        except:
+                            pass
+                    
+                    self.consultas_tree.insert("", "end", values=(
+                        consulta.get('id', ''),
+                        consulta.get('nombre', ''),
+                        consulta.get('descripcion', ''),
+                        conexion_nombre,
+                        control_nombre,
+                        consulta.get('fecha_creacion', '')
+                    ))
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al cargar consultas: {str(e)}")
+    
+    def new_consulta(self):
+        """Crea una nueva consulta"""
+        from .consulta_dialogs import CreateConsultaDialog
+        
+        dialog = CreateConsultaDialog(
+            self.root,
+            self.consulta_ctrl,
+            self.conexion_ctrl,
+            self.control_ctrl
+        )
+        
+        # Esperar a que se cierre el diálogo
+        self.root.wait_window(dialog.dialog)
+        
+        # Si se creó exitosamente, actualizar la lista
+        if dialog.result:
+            self.refresh_consultas()
+    
+    def edit_consulta(self):
+        """Edita la consulta seleccionada"""
+        selection = self.consultas_tree.selection()
+        if not selection:
+            messagebox.showwarning("Advertencia", "Selecciona una consulta para editar")
+            return
+        
+        # Obtener datos de la consulta seleccionada
+        item = self.consultas_tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            messagebox.showerror("Error", "No se pudieron obtener los datos de la consulta")
+            return
+        
+        consulta_id = values[0]
+        
+        # Obtener datos completos de la consulta
+        response = self.consulta_ctrl.obtener_por_id(consulta_id)
+        if not response.get('success', False):
+            messagebox.showerror("Error", "No se pudieron obtener los datos de la consulta")
+            return
+        
+        consulta_data = response.get('data', {})
+        
+        # Abrir diálogo de edición
+        from .consulta_dialogs import EditConsultaDialog
+        
+        dialog = EditConsultaDialog(
+            self.root,
+            self.consulta_ctrl,
+            self.conexion_ctrl,
+            consulta_data
+        )
+        
+        # Esperar a que se cierre el diálogo
+        self.root.wait_window(dialog.dialog)
+        
+        # Si se editó exitosamente, actualizar la lista
+        if dialog.result:
+            self.refresh_consultas()
+    
+    def delete_consulta(self):
+        """Elimina la consulta seleccionada"""
+        selection = self.consultas_tree.selection()
+        if not selection:
+            messagebox.showwarning("Advertencia", "Selecciona una consulta para eliminar")
+            return
+        
+        # Obtener datos de la consulta seleccionada
+        item = self.consultas_tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            messagebox.showerror("Error", "No se pudieron obtener los datos de la consulta")
+            return
+        
+        consulta_id = values[0]
+        consulta_nombre = values[1]
+        
+        # Confirmar eliminación
+        respuesta = messagebox.askyesno(
+            "Confirmar Eliminación",
+            f"¿Estás seguro de que quieres eliminar la consulta '{consulta_nombre}'?\n\nEsta acción no se puede deshacer."
+        )
+        
+        if not respuesta:
+            return
+        
+        try:
+            response = self.consulta_ctrl.eliminar_consulta(consulta_id)
+            
+            if response.get('success', False):
+                messagebox.showinfo("Éxito", "Consulta eliminada exitosamente")
+                self.refresh_consultas()
+            else:
+                error = response.get('error', 'Error desconocido')
+                messagebox.showerror("Error", f"Error al eliminar la consulta: {error}")
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al eliminar la consulta: {str(e)}")
+    
+    def execute_consulta(self):
+        """Ejecuta la consulta seleccionada"""
+        selection = self.consultas_tree.selection()
+        if not selection:
+            messagebox.showwarning("Advertencia", "Selecciona una consulta para ejecutar")
+            return
+        
+        # Obtener datos de la consulta seleccionada
+        item = self.consultas_tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            messagebox.showerror("Error", "No se pudieron obtener los datos de la consulta")
+            return
+        
+        consulta_id = values[0]
+        consulta_nombre = values[1]
+        
+        # Obtener datos completos de la consulta
+        response = self.consulta_ctrl.obtener_por_id(consulta_id)
+        if not response.get('success', False):
+            messagebox.showerror("Error", "No se pudieron obtener los datos de la consulta")
+            return
+        
+        consulta_data = response.get('data', {})
+        sql_sentence = consulta_data.get('sql', '')  # Cambiado de 'sql_sentence' a 'sql'
+        
+        if not sql_sentence.strip():
+            messagebox.showerror("Error", "La consulta no tiene una sentencia SQL válida")
+            return
+        
+        # Mostrar ventana de confirmación con la SQL
+        from tkinter import scrolledtext
+        
+        confirm_window = tk.Toplevel(self.root)
+        confirm_window.title(f"Ejecutar Consulta: {consulta_nombre}")
+        confirm_window.geometry("800x500")
+        confirm_window.grab_set()
+        confirm_window.resizable(True, True)
+        confirm_window.transient(self.root)
+        
+        # Título
+        ttk.Label(confirm_window, text=f"Consulta: {consulta_nombre}", font=("Arial", 12, "bold")).pack(pady=10)
+        
+        # SQL Text Area
+        ttk.Label(confirm_window, text="Sentencia SQL:").pack(anchor="w", padx=10)
+        sql_text = scrolledtext.ScrolledText(confirm_window, height=15, wrap=tk.WORD)
+        sql_text.pack(fill="both", expand=True, padx=10, pady=5)
+        sql_text.insert("1.0", sql_sentence)
+        sql_text.configure(state="disabled")
+        
+        # Botones
+        button_frame = ttk.Frame(confirm_window)
+        button_frame.pack(fill="x", padx=10, pady=10)
+        
+        def ejecutar():
+            confirm_window.destroy()
+            self._ejecutar_consulta_sql(consulta_id, consulta_nombre, sql_sentence, consulta_data)
+        
+        ttk.Button(button_frame, text="Ejecutar", command=ejecutar).pack(side="right", padx=5)
+        ttk.Button(button_frame, text="Cancelar", command=confirm_window.destroy).pack(side="right", padx=5)
+    
+    def _ejecutar_consulta_sql(self, consulta_id, consulta_nombre, sql_sentence, consulta_data):
+        """Ejecuta la sentencia SQL de la consulta"""
+        try:
+            # Obtener la consulta completa
+            consulta_response = self.consulta_ctrl.obtener_por_id(consulta_id)
+            if not consulta_response.get('success', False):
+                messagebox.showerror("Error", "No se pudo obtener la consulta")
+                return
+            
+            consulta_info = consulta_response.get('data', {})
+            
+            # Determinar la conexión a usar
+            conexion_id = consulta_info.get('conexion_id')
+            print(f"DEBUG: conexion_id de la consulta: {conexion_id}")
+            
+            if not conexion_id:
+                # Si la consulta no tiene conexión específica, usar la primera disponible
+                print("DEBUG: No hay conexion_id, buscando primera disponible...")
+                conexiones_response = self.conexion_ctrl.obtener_todas()
+                print(f"DEBUG: Respuesta obtener_todas: {conexiones_response}")
+                if not conexiones_response.get('success', False) or not conexiones_response.get('data'):
+                    messagebox.showerror("Error", "No hay conexiones disponibles")
+                    return
+                conexion_id = conexiones_response['data'][0]['id']
+                print(f"DEBUG: Usando primera conexión disponible: {conexion_id}")
+            
+            # Obtener la conexión
+            print(f"DEBUG: Intentando obtener conexión ID: {conexion_id}")
+            conexion_response = self.conexion_ctrl.obtener_por_id(conexion_id)
+            print(f"DEBUG: Respuesta obtener_por_id: {conexion_response}")
+            if not conexion_response.get('success', False):
+                error_msg = conexion_response.get('error', 'Error desconocido')
+                messagebox.showerror("Error", f"No se pudo obtener la conexión: {error_msg}")
+                return
+            
+            conexion_data = conexion_response.get('data', {})
+            
+            # Crear entidades para la simulación
+            from src.domain.entities.consulta import Consulta
+            from src.domain.entities.conexion import Conexion
+            
+            consulta_entity = Consulta(
+                id=consulta_id,
+                nombre=consulta_nombre,
+                sql=sql_sentence,
+                descripcion=consulta_info.get('descripcion', ''),
+                conexion_id=conexion_id,
+                activa=True
+            )
+            
+            # Debug: mostrar datos de conexión
+            print(f"DEBUG: Datos de conexión recibidos: {conexion_data}")
+            
+            conexion_entity = Conexion(
+                id=conexion_data.get('id'),
+                nombre=conexion_data.get('nombre', ''),
+                tipo_motor=conexion_data.get('motor', 'postgresql'),  # Usar 'motor'
+                servidor=conexion_data.get('servidor', ''),          # Usar 'servidor'
+                puerto=conexion_data.get('puerto', 0),
+                base_datos=conexion_data.get('base_datos', ''),
+                usuario=conexion_data.get('usuario', ''),
+                contraseña=conexion_data.get('contraseña', ''),     # Agregar contraseña
+                activa=True
+            )
+            
+            print(f"DEBUG: Entidad conexión creada: motor={conexion_entity.tipo_motor}, servidor={conexion_entity.servidor}")
+            
+            # Ejecutar la consulta usando el servicio (en modo simulación)
+            # Acceder al servicio de ejecución directamente desde el use case
+            ejecucion_service = self.ejecucion_ctrl.ejecutar_use_case.ejecucion_service
+            resultado_consulta = ejecucion_service._ejecutar_consulta(
+                consulta_entity, 
+                {},  # Sin parámetros por ahora
+                conexion_entity,
+                mock_execution=False,  # Cambiar a False para ejecución real
+                es_disparo=False
+            )
+            
+            # Mostrar resultados
+            self._mostrar_resultado_consulta(consulta_nombre, resultado_consulta)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al ejecutar la consulta: {str(e)}")
+            import traceback
+            print(f"Error detallado: {traceback.format_exc()}")
+    
+    def _mostrar_resultado_consulta(self, consulta_nombre, resultado):
+        """Muestra los resultados de la ejecución de una consulta"""
+        # Crear ventana de resultados
+        result_window = tk.Toplevel(self.root)
+        result_window.title(f"Resultados: {consulta_nombre}")
+        result_window.geometry("800x600")
+        result_window.grab_set()
+        result_window.resizable(True, True)
+        
+        # Frame principal
+        main_frame = ttk.Frame(result_window)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Título
+        ttk.Label(main_frame, text=f"Resultados de: {consulta_nombre}", 
+                  font=("Arial", 12, "bold")).pack(pady=(0, 10))
+        
+        # Información de ejecución
+        info_frame = ttk.LabelFrame(main_frame, text="Información de Ejecución")
+        info_frame.pack(fill="x", pady=(0, 10))
+        
+        ttk.Label(info_frame, text=f"Tiempo de ejecución: {resultado.tiempo_ejecucion_ms:.1f} ms").pack(anchor="w", padx=10, pady=2)
+        ttk.Label(info_frame, text=f"Filas afectadas: {resultado.filas_afectadas}").pack(anchor="w", padx=10, pady=2)
+        
+        if resultado.error:
+            ttk.Label(info_frame, text=f"Error: {resultado.error}", foreground="red").pack(anchor="w", padx=10, pady=2)
+        
+        # SQL ejecutado
+        sql_frame = ttk.LabelFrame(main_frame, text="SQL Ejecutado")
+        sql_frame.pack(fill="x", pady=(0, 10))
+        
+        from tkinter import scrolledtext
+        sql_text = scrolledtext.ScrolledText(sql_frame, height=4, wrap=tk.WORD)
+        sql_text.pack(fill="x", padx=10, pady=10)
+        sql_text.insert("1.0", resultado.sql_ejecutado)
+        sql_text.config(state="disabled")
+        
+        # Datos resultantes
+        if resultado.datos and not resultado.error:
+            data_frame = ttk.LabelFrame(main_frame, text="Datos Resultantes")
+            data_frame.pack(fill="both", expand=True, pady=(0, 10))
+            
+            # Crear frame para el treeview y scrollbars
+            tree_frame = ttk.Frame(data_frame)
+            tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            # Crear Treeview para mostrar datos
+            columns = list(resultado.datos[0].keys()) if resultado.datos else []
+            tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
+            
+            # Configurar columnas con mejor ancho
+            for col in columns:
+                tree.heading(col, text=col)
+                # Calcular ancho basado en el contenido
+                max_width = max(
+                    len(col) * 8,  # Ancho del header
+                    max(len(str(row.get(col, ''))) for row in resultado.datos[:10]) * 8  # Ancho del contenido (sample)
+                )
+                tree.column(col, width=min(max_width, 200), minwidth=50)  # Máximo 200px, mínimo 50px
+            
+            # Insertar datos
+            for row_data in resultado.datos[:100]:  # Mostrar hasta 100 filas
+                values = []
+                for col in columns:
+                    value = row_data.get(col, '')
+                    # Truncar valores muy largos para mejor visualización
+                    if isinstance(value, str) and len(value) > 50:
+                        value = value[:47] + "..."
+                    values.append(str(value))
+                tree.insert("", "end", values=values)
+            
+            # Scrollbars
+            v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+            h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
+            tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+            
+            # Pack con grid para mejor control
+            tree.grid(row=0, column=0, sticky="nsew")
+            v_scrollbar.grid(row=0, column=1, sticky="ns")
+            h_scrollbar.grid(row=1, column=0, sticky="ew")
+            
+            # Configurar grid weights
+            tree_frame.grid_rowconfigure(0, weight=1)
+            tree_frame.grid_columnconfigure(0, weight=1)
+            
+            # Información adicional
+            info_text = f"Mostrando {min(len(resultado.datos), 100)} filas de {len(resultado.datos)} totales"
+            if len(columns) > 10:
+                info_text += f" - {len(columns)} columnas (use scroll horizontal para ver todas)"
+            
+            ttk.Label(data_frame, text=info_text, font=("Arial", 9)).pack(pady=(0, 5))
+        
+        # Botón cerrar
+        ttk.Button(main_frame, text="Cerrar", command=result_window.destroy).pack(pady=10)
     
     def execute_selected_control(self):
         """Ejecuta el control seleccionado"""

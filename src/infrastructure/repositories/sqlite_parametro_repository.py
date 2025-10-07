@@ -119,3 +119,24 @@ class SQLiteParametroRepository(ParametroRepository):
             valor_por_defecto=row['valor_por_defecto'],
             obligatorio=bool(row['obligatorio'])
         )
+    
+    def obtener_por_control(self, control_id: int) -> List[Parametro]:
+        """Obtiene todos los parámetros asociados a un control"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            # Obtener los IDs de parámetros del control
+            cursor = conn.execute(
+                "SELECT parametros_ids FROM controles WHERE id = ?",
+                (control_id,)
+            )
+            row = cursor.fetchone()
+            if not row or not row['parametros_ids']:
+                return []
+            
+            # Decodificar JSON y obtener parámetros
+            import json
+            try:
+                parametro_ids = json.loads(row['parametros_ids'])
+                return self.obtener_por_ids(parametro_ids)
+            except (json.JSONDecodeError, TypeError):
+                return []

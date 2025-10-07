@@ -3,6 +3,7 @@ Ventanas de diálogo simples para crear y editar entidades
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
+from src.presentation.gui.consulta_dialogs import EditConsultaDialog
 
 
 class CreateConnectionDialog:
@@ -634,6 +635,185 @@ class ExecutionParametersDialog:
         messagebox.showinfo("Info", "Funcionalidad de ejecución simplificada")
         self.dialog.destroy()
         
+    def cancel(self):
+        """Cancela la operación"""
+        self.dialog.destroy()
+
+
+class CreateConsultaDialog:
+    """Diálogo para crear nueva consulta"""
+    
+    def __init__(self, parent, consulta_controller, conexion_controller, control_id=None):
+        self.result = None
+        self.consulta_ctrl = consulta_controller
+        self.conexion_ctrl = conexion_controller
+        self.control_id = control_id
+        
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Crear Nueva Consulta")
+        self.dialog.geometry("600x500")
+        self.dialog.grab_set()
+        
+        self.create_widgets()
+        self._cargar_conexiones()
+        
+    def create_widgets(self):
+        """Crea widgets del formulario"""
+        # Frame principal con scroll
+        main_frame = ttk.Frame(self.dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Información básica
+        ttk.Label(main_frame, text="Información de la Consulta", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        
+        ttk.Label(main_frame, text="Nombre:").grid(row=1, column=0, sticky="w", pady=5)
+        self.nombre_var = tk.StringVar()
+        ttk.Entry(main_frame, textvariable=self.nombre_var, width=40).grid(row=1, column=1, pady=5, padx=(10, 0))
+        
+        ttk.Label(main_frame, text="Descripción:").grid(row=2, column=0, sticky="nw", pady=5)
+        self.descripcion_text = tk.Text(main_frame, width=35, height=2)
+        self.descripcion_text.grid(row=2, column=1, pady=5, padx=(10, 0))
+        
+        # Tipo de consulta
+        ttk.Label(main_frame, text="Tipo:").grid(row=3, column=0, sticky="w", pady=5)
+        self.tipo_var = tk.StringVar()
+        tipo_frame = ttk.Frame(main_frame)
+        tipo_frame.grid(row=3, column=1, sticky="w", pady=5, padx=(10, 0))
+        
+        ttk.Radiobutton(tipo_frame, text="Consulta de disparo", variable=self.tipo_var, value="disparo").pack(side="left", padx=(0, 10))
+        ttk.Radiobutton(tipo_frame, text="Consulta disparada", variable=self.tipo_var, value="disparada").pack(side="left")
+        self.tipo_var.set("disparada")  # Valor por defecto
+        
+        # Conexión específica (opcional)
+        ttk.Label(main_frame, text="Conexión específica:").grid(row=4, column=0, sticky="w", pady=5)
+        self.conexion_var = tk.StringVar()
+        self.conexion_combo = ttk.Combobox(main_frame, textvariable=self.conexion_var, width=37, state="readonly")
+        self.conexion_combo.grid(row=4, column=1, pady=5, padx=(10, 0))
+        
+        # SQL Editor
+        ttk.Label(main_frame, text="Consulta SQL:", font=("Arial", 10, "bold")).grid(row=5, column=0, columnspan=2, sticky="w", pady=(20, 5))
+        
+        # Frame para el SQL con scrollbars
+        sql_frame = ttk.Frame(main_frame)
+        sql_frame.grid(row=6, column=0, columnspan=2, sticky="ew", pady=5)
+        sql_frame.grid_columnconfigure(0, weight=1)
+        
+        self.sql_text = tk.Text(sql_frame, width=60, height=8, font=("Consolas", 10))
+        sql_scrollbar = ttk.Scrollbar(sql_frame, orient="vertical", command=self.sql_text.yview)
+        self.sql_text.configure(yscrollcommand=sql_scrollbar.set)
+        
+        self.sql_text.grid(row=0, column=0, sticky="ew")
+        sql_scrollbar.grid(row=0, column=1, sticky="ns")
+        
+        # Estado
+        ttk.Label(main_frame, text="Estado:").grid(row=7, column=0, sticky="w", pady=5)
+        self.activa_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(main_frame, text="Consulta activa", variable=self.activa_var).grid(row=7, column=1, sticky="w", pady=5, padx=(10, 0))
+        
+        # Botones
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.grid(row=8, column=0, columnspan=2, pady=20)
+        
+        ttk.Button(buttons_frame, text="Crear", command=self.create_consulta).pack(side="left", padx=5)
+        ttk.Button(buttons_frame, text="Cancelar", command=self.cancel).pack(side="left", padx=5)
+        
+        # Configurar grid
+        main_frame.columnconfigure(1, weight=1)
+        
+    def _cargar_conexiones(self):
+        """Carga la lista de conexiones disponibles"""
+        try:
+            # Obtener conexiones reales desde el controlador
+            if self.conexion_ctrl:
+                response = self.conexion_ctrl.obtener_todas()
+                if response.get('success', False):
+                    conexiones_bd = response.get('data', [])
+                    self.conexiones_disponibles = [{"id": None, "nombre": "(Usar conexión del control)"}]
+                    
+                    for conn in conexiones_bd:
+                        self.conexiones_disponibles.append({
+                            "id": conn.get('id'),
+                            "nombre": f"{conn.get('nombre')} (ID: {conn.get('id')})"
+                        })
+                else:
+                    self.conexiones_disponibles = [{"id": None, "nombre": "(Sin conexiones disponibles)"}]
+            else:
+                self.conexiones_disponibles = [{"id": None, "nombre": "(Sin controlador de conexiones)"}]
+            
+            # Configurar valores del combobox
+            valores_combo = [f"{conn['nombre']}" for conn in self.conexiones_disponibles]
+            self.conexion_combo['values'] = valores_combo
+            self.conexion_combo.current(0)  # Seleccionar primera opción por defecto
+            
+        except Exception as e:
+            print(f"Error cargando conexiones: {e}")
+            self.conexiones_disponibles = [{"id": None, "nombre": "Error al cargar conexiones"}]
+            self.conexion_combo['values'] = ["Error al cargar conexiones"]
+            self.conexion_combo.current(0)
+            
+    def create_consulta(self):
+        """Crea la consulta con los datos del formulario"""
+        try:
+            # Validaciones básicas
+            nombre = self.nombre_var.get().strip()
+            if not nombre:
+                messagebox.showerror("Error", "El nombre de la consulta es requerido")
+                return
+            
+            sql = self.sql_text.get('1.0', tk.END).strip()
+            if not sql:
+                messagebox.showerror("Error", "La consulta SQL es requerida")
+                return
+            
+            # Obtener datos del formulario
+            descripcion = self.descripcion_text.get('1.0', tk.END).strip()
+            tipo = self.tipo_var.get()
+            activa = self.activa_var.get()
+            
+            # Obtener conexión seleccionada
+            conexion_seleccionada_idx = self.conexion_combo.current()
+            conexion_id = None
+            if conexion_seleccionada_idx >= 0 and conexion_seleccionada_idx < len(self.conexiones_disponibles):
+                conexion_id = self.conexiones_disponibles[conexion_seleccionada_idx]['id']
+            
+            # Verificar que el controlador esté disponible
+            if not self.consulta_ctrl:
+                messagebox.showerror("Error", "Controlador de consultas no está disponible")
+                return
+            
+            # Llamar al controlador para crear
+            response = self.consulta_ctrl.crear_consulta(
+                nombre=nombre,
+                sql=sql,
+                descripcion=descripcion,
+                tipo=tipo,
+                control_id=self.control_id,
+                conexion_id=conexion_id,
+                activa=activa
+            )
+            
+            if response.get('success', False):
+                messagebox.showinfo("Éxito", f"Consulta '{nombre}' creada exitosamente")
+                
+                self.result = {
+                    'success': True,
+                    'data': response.get('data', {}),
+                    'nombre': nombre,
+                    'sql': sql,
+                    'descripcion': descripcion,
+                    'tipo': tipo,
+                    'conexion_id': conexion_id,
+                    'activa': activa
+                }
+                
+                self.dialog.destroy()
+            else:
+                error = response.get('error', 'Error desconocido')
+                messagebox.showerror("Error", f"No se pudo crear la consulta: {error}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al crear la consulta: {str(e)}")
+            
     def cancel(self):
         """Cancela la operación"""
         self.dialog.destroy()

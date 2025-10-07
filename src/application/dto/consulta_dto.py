@@ -8,10 +8,11 @@ from typing import Optional
 @dataclass
 class CrearConsultaDTO:
     """DTO para crear una nueva consulta"""
-    control_id: int
     nombre: str
     sql: str
-    tipo: str
+    descripcion: str = ""
+    control_id: Optional[int] = None
+    conexion_id: Optional[int] = None  # Conexión específica (opcional)
     activa: bool = True
 
 
@@ -19,10 +20,11 @@ class CrearConsultaDTO:
 class ConsultaResponseDTO:
     """DTO de respuesta para consulta"""
     id: int
-    control_id: int
     nombre: str
     sql: str
-    tipo: str
+    descripcion: str
+    control_id: Optional[int]
+    conexion_id: Optional[int]
     activa: bool
 
 
@@ -31,5 +33,6 @@ class ActualizarConsultaDTO:
     """DTO para actualizar una consulta existente"""
     nombre: Optional[str] = None
     sql: Optional[str] = None
-    tipo: Optional[str] = None
+    descripcion: Optional[str] = None
+    conexion_id: Optional[int] = None
     activa: Optional[bool] = None

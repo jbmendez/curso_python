@@ -22,6 +22,8 @@ class ConexionController:
         self._crear_conexion_use_case = crear_conexion_use_case
         self._listar_conexiones_use_case = listar_conexiones_use_case
         self._actualizar_conexion_use_case = actualizar_conexion_use_case
+        # Obtener referencia al repositorio desde el use case
+        self._conexion_repository = crear_conexion_use_case._conexion_repository if crear_conexion_use_case else None
     
     def obtener_todas(self) -> Dict[str, Any]:
         """Obtiene todas las conexiones para la interfaz GUI"""
@@ -58,6 +60,51 @@ class ConexionController:
                 'data': conexiones_data,
                 'status': 200,
                 'message': f'Se encontraron {len(conexiones_data)} conexiones'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'status': 500
+            }
+    
+    def obtener_por_id(self, conexion_id: int) -> Dict[str, Any]:
+        """Obtiene una conexión específica por su ID"""
+        try:
+            if self._conexion_repository is None:
+                return {
+                    'success': False,
+                    'error': 'Repositorio de conexiones no disponible',
+                    'status': 500
+                }
+            
+            conexion = self._conexion_repository.obtener_por_id(conexion_id)
+            if not conexion:
+                return {
+                    'success': False,
+                    'error': f'Conexión con ID {conexion_id} no encontrada',
+                    'status': 404
+                }
+            
+            conexion_data = {
+                'id': conexion.id,
+                'nombre': conexion.nombre,
+                'motor': conexion.tipo_motor,    # Usar 'motor' para consistencia
+                'servidor': conexion.servidor,  # Usar 'servidor' para consistencia
+                'puerto': conexion.puerto,
+                'base_datos': conexion.base_datos,
+                'usuario': conexion.usuario,
+                'contraseña': conexion.contraseña,  # Incluir contraseña para ejecución
+                'activa': conexion.activa,
+                'driver_type': getattr(conexion, 'driver_type', 'default')
+            }
+            
+            return {
+                'success': True,
+                'data': conexion_data,
+                'status': 200,
+                'message': 'Conexión obtenida exitosamente'
             }
             
         except Exception as e:

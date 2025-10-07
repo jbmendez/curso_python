@@ -30,6 +30,11 @@ class ParametroRepository(ABC):
         pass
     
     @abstractmethod
+    def obtener_por_control(self, control_id: int) -> List[Parametro]:
+        """Obtiene todos los parámetros asociados a un control"""
+        pass
+    
+    @abstractmethod
     def guardar(self, parametro: Parametro) -> Parametro:
         """Guarda un parámetro (crear o actualizar)"""
         pass

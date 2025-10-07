@@ -16,6 +16,8 @@ class Consulta:
     nombre: str = ""
     sql: str = ""
     descripcion: str = ""
+    control_id: Optional[int] = None
+    conexion_id: Optional[int] = None
     activa: bool = True
     
     def es_sql_valido(self) -> bool:
@@ -23,9 +25,29 @@ class Consulta:
         if not self.sql or not self.sql.strip():
             return False
         
-        # Verificar que contenga al menos SELECT
+        # Verificar que sea una sentencia SQL válida
         sql_upper = self.sql.upper().strip()
-        return sql_upper.startswith('SELECT')
+        
+        # Permitir SELECT, WITH (CTE), EXPLAIN, SHOW, CALL, EXECUTE, etc.
+        sentencias_validas = [
+            'SELECT',      # Consultas básicas
+            'WITH',        # Common Table Expressions (CTE)
+            'EXPLAIN',     # Planes de ejecución
+            'SHOW',        # Comandos SHOW (MySQL, etc.)
+            'DESCRIBE',    # Describir estructura
+            'DESC',        # Alias de DESCRIBE
+            'PRAGMA',      # SQLite pragmas
+            'CALL',        # Stored procedures (CALL procedimiento)
+            'EXECUTE',     # Stored procedures (EXECUTE procedimiento)
+            'EXEC'         # Alias de EXECUTE (SQL Server style)
+        ]
+        
+        return any(sql_upper.startswith(sentencia) for sentencia in sentencias_validas)
+    
+    def es_valida(self) -> bool:
+        """Validación general de la entidad"""
+        return (self.nombre and self.nombre.strip() and 
+                self.sql and self.sql.strip())
     
     def obtener_parametros_en_sql(self) -> List[str]:
         """Extrae los nombres de parámetros del SQL (formato :parametro)"""

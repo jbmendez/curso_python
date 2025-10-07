@@ -5,7 +5,7 @@ Este caso de uso maneja la creación de una nueva consulta SQL
 """
 from src.domain.entities.consulta import Consulta
 from src.domain.repositories.consulta_repository import ConsultaRepository
-from src.application.dto.entidades_dto import CrearConsultaDTO, ConsultaResponseDTO
+from src.application.dto.consulta_dto import CrearConsultaDTO, ConsultaResponseDTO
 
 
 class CrearConsultaUseCase:
@@ -27,10 +27,15 @@ class CrearConsultaUseCase:
             nombre=datos.nombre,
             sql=datos.sql,
             descripcion=datos.descripcion,
-            activa=True
+            control_id=datos.control_id,
+            conexion_id=datos.conexion_id,
+            activa=datos.activa
         )
         
         # Validaciones de negocio
+        if not consulta.es_valida():
+            raise ValueError("Los datos de la consulta no son válidos")
+        
         if not consulta.es_sql_valido():
             raise ValueError("El SQL proporcionado no es válido")
         
@@ -46,5 +51,7 @@ class CrearConsultaUseCase:
             nombre=consulta_guardada.nombre,
             sql=consulta_guardada.sql,
             descripcion=consulta_guardada.descripcion,
+            control_id=consulta_guardada.control_id,
+            conexion_id=consulta_guardada.conexion_id,
             activa=consulta_guardada.activa
         )
