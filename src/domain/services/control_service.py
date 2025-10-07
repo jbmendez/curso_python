@@ -36,8 +36,8 @@ class ControlService:
         """Valida si un control puede ser creado"""
         errores = []
         
-        # Validaciones básicas de la entidad
-        if not control.es_configuracion_valida():
+        # Validaciones básicas de la entidad (solo nombre y conexión para creación)
+        if not control.es_configuracion_basica_valida():
             errores.append("La configuración básica del control no es válida")
         
         # Verificar que la conexión existe y es válida
@@ -50,8 +50,8 @@ class ControlService:
             elif not conexion.es_configuracion_valida():
                 errores.append("La configuración de la conexión no es válida")
         
-        # Verificar que la consulta de disparo existe y es válida
-        if control.consulta_disparo_id:
+        # Verificar que la consulta de disparo existe y es válida (solo si se especifica)
+        if control.consulta_disparo_id is not None:
             consulta = self._consulta_repository.obtener_por_id(control.consulta_disparo_id)
             if not consulta:
                 errores.append("La consulta de disparo especificada no existe")
@@ -62,7 +62,7 @@ class ControlService:
             elif consulta.es_consulta_peligrosa():
                 errores.append("La consulta de disparo contiene operaciones peligrosas")
         
-        # Verificar que las consultas a disparar existen y son válidas
+        # Verificar que las consultas a disparar existen y son válidas (solo si se especifican)
         if control.consultas_a_disparar_ids:
             consultas = self._consulta_repository.obtener_por_ids(control.consultas_a_disparar_ids)
             if len(consultas) != len(control.consultas_a_disparar_ids):
@@ -76,13 +76,13 @@ class ControlService:
                     if consulta.es_consulta_peligrosa():
                         errores.append(f"La consulta '{consulta.nombre}' contiene operaciones peligrosas")
         
-        # Verificar que los parámetros existen
+        # Verificar que los parámetros existen (solo si se especifican)
         if control.parametros_ids:
             parametros = self._parametro_repository.obtener_por_ids(control.parametros_ids)
             if len(parametros) != len(control.parametros_ids):
                 errores.append("Algunos parámetros especificados no existen")
         
-        # Verificar que los referentes existen
+        # Verificar que los referentes existen (solo si se especifican)
         if control.referentes_ids:
             referentes = self._referente_repository.obtener_por_ids(control.referentes_ids)
             if len(referentes) != len(control.referentes_ids):

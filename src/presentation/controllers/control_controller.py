@@ -51,10 +51,9 @@ class ControlController:
     def crear_control(self, datos_request: Dict[str, Any]) -> Dict[str, Any]:
         """Endpoint para crear un nuevo control"""
         try:
-            # Validar datos de entrada obligatorios
+            # Validar datos de entrada obligatorios (solo campos básicos para creación)
             campos_obligatorios = [
-                'nombre', 'descripcion', 'conexion_id', 
-                'consulta_disparo_id', 'consultas_a_disparar_ids'
+                'nombre', 'descripcion', 'conexion_id'
             ]
             
             for campo in campos_obligatorios:
@@ -64,13 +63,20 @@ class ControlController:
                         'status': 400
                     }
             
-            # Crear DTO
+            # Validar que consultas_a_disparar_ids esté presente (puede ser lista vacía)
+            if 'consultas_a_disparar_ids' not in datos_request:
+                return {
+                    'error': 'El campo consultas_a_disparar_ids es obligatorio',
+                    'status': 400
+                    }
+            
+            # Crear DTO (consulta_disparo_id puede ser None para creación inicial)
             dto = CrearControlDTO(
                 nombre=datos_request['nombre'],
                 descripcion=datos_request['descripcion'],
                 disparar_si_hay_datos=datos_request.get('disparar_si_hay_datos', True),
                 conexion_id=datos_request['conexion_id'],
-                consulta_disparo_id=datos_request['consulta_disparo_id'],
+                consulta_disparo_id=datos_request.get('consulta_disparo_id'),  # Puede ser None
                 consultas_a_disparar_ids=datos_request['consultas_a_disparar_ids'],
                 parametros_ids=datos_request.get('parametros_ids', []),
                 referentes_ids=datos_request.get('referentes_ids', [])

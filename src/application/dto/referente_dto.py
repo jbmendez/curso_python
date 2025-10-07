@@ -8,20 +8,20 @@ from typing import Optional
 @dataclass
 class CrearReferenteDTO:
     """DTO para crear un nuevo referente"""
-    control_id: int
     nombre: str
     email: str
-    cargo: str
+    path_archivos: str = ""
+    activo: bool = True
 
 
 @dataclass
 class ReferenteResponseDTO:
     """DTO de respuesta para referente"""
     id: int
-    control_id: int
     nombre: str
     email: str
-    cargo: str
+    path_archivos: str
+    activo: bool
 
 
 @dataclass
@@ -29,4 +29,5 @@ class ActualizarReferenteDTO:
     """DTO para actualizar un referente existente"""
     nombre: Optional[str] = None
     email: Optional[str] = None
-    cargo: Optional[str] = None
+    path_archivos: Optional[str] = None
+    activo: Optional[bool] = None

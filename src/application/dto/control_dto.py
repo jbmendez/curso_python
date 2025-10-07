@@ -13,7 +13,7 @@ class CrearControlDTO:
     descripcion: str
     disparar_si_hay_datos: bool
     conexion_id: int
-    consulta_disparo_id: int
+    consulta_disparo_id: Optional[int]  # Puede ser None para creación inicial
     consultas_a_disparar_ids: List[int]
     parametros_ids: List[int]
     referentes_ids: List[int]

@@ -15,14 +15,22 @@ class CrearReferenteUseCase:
     def ejecutar(self, datos: CrearReferenteDTO) -> ReferenteResponseDTO:
         """Ejecuta el caso de uso de creación de referente"""
         
+        # Verificar que el email no exista
+        referente_existente = self._referente_repository.obtener_por_email(datos.email)
+        if referente_existente:
+            raise ValueError(f"Ya existe un referente con el email '{datos.email}'")
+        
         # Crear entidad referente
         referente = Referente(
-            id=None,
-            control_id=datos.control_id,
             nombre=datos.nombre,
             email=datos.email,
-            cargo=datos.cargo
+            path_archivos=datos.path_archivos,
+            activo=datos.activo
         )
+        
+        # Validaciones de negocio
+        if not referente.es_valido():
+            raise ValueError("Los datos del referente no son válidos")
         
         # Guardar referente
         referente_guardado = self._referente_repository.guardar(referente)
@@ -30,8 +38,8 @@ class CrearReferenteUseCase:
         # Retornar DTO de respuesta
         return ReferenteResponseDTO(
             id=referente_guardado.id,
-            control_id=referente_guardado.control_id,
             nombre=referente_guardado.nombre,
             email=referente_guardado.email,
-            cargo=referente_guardado.cargo
+            path_archivos=referente_guardado.path_archivos,
+            activo=referente_guardado.activo
         )

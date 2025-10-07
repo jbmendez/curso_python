@@ -325,37 +325,174 @@ class EditConnectionDialog:
 class CreateControlDialog:
     """Diálogo para crear nuevo control"""
     
-    def __init__(self, parent, control_controller):
+    def __init__(self, parent, control_controller, conexion_controller=None):
         self.result = None
         self.control_ctrl = control_controller
+        self.conexion_ctrl = conexion_controller
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Nuevo Control")
-        self.dialog.geometry("400x200")
+        self.dialog.geometry("500x450")
         self.dialog.grab_set()
         
         self.create_widgets()
         
     def create_widgets(self):
-        """Crea widgets básicos"""
-        frame = ttk.Frame(self.dialog)
-        frame.pack(fill="both", expand=True, padx=20, pady=20)
+        """Crea widgets completos del formulario"""
+        # Frame principal con scroll
+        main_frame = ttk.Frame(self.dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ttk.Label(frame, text="Nombre:").grid(row=0, column=0, sticky="w", pady=5)
+        # Información básica
+        ttk.Label(main_frame, text="Información del Control", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        
+        ttk.Label(main_frame, text="Nombre:").grid(row=1, column=0, sticky="w", pady=5)
         self.nombre_var = tk.StringVar()
-        ttk.Entry(frame, textvariable=self.nombre_var, width=30).grid(row=0, column=1, pady=5)
+        ttk.Entry(main_frame, textvariable=self.nombre_var, width=40).grid(row=1, column=1, pady=5, padx=(10, 0))
         
-        buttons_frame = ttk.Frame(frame)
-        buttons_frame.grid(row=1, column=0, columnspan=2, pady=20)
+        ttk.Label(main_frame, text="Descripción:").grid(row=2, column=0, sticky="nw", pady=5)
+        self.descripcion_text = tk.Text(main_frame, width=35, height=3)
+        self.descripcion_text.grid(row=2, column=1, pady=5, padx=(10, 0))
+        
+        # Estado del control
+        ttk.Label(main_frame, text="Estado:").grid(row=3, column=0, sticky="w", pady=5)
+        self.activo_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(main_frame, text="Control activo", variable=self.activo_var).grid(row=3, column=1, sticky="w", pady=5, padx=(10, 0))
+        
+        # Configuración de disparo
+        ttk.Label(main_frame, text="Configuración de Disparo", font=("Arial", 10, "bold")).grid(row=4, column=0, columnspan=2, sticky="w", pady=(20, 10))
+        
+        ttk.Label(main_frame, text="Disparar cuando:").grid(row=5, column=0, sticky="w", pady=5)
+        self.disparo_var = tk.StringVar(value="true")  # Valor por defecto: HAY datos
+        disparo_frame = ttk.Frame(main_frame)
+        disparo_frame.grid(row=5, column=1, sticky="w", pady=5, padx=(10, 0))
+        
+        ttk.Radiobutton(disparo_frame, text="HAY datos", variable=self.disparo_var, value="true").pack(side="left", padx=(0, 10))
+        ttk.Radiobutton(disparo_frame, text="NO hay datos", variable=self.disparo_var, value="false").pack(side="left")
+        
+        # Conexión asociada
+        ttk.Label(main_frame, text="Conexión:").grid(row=6, column=0, sticky="w", pady=5)
+        self.conexion_var = tk.StringVar()
+        self.conexion_combo = ttk.Combobox(main_frame, textvariable=self.conexion_var, width=37, state="readonly")
+        self.conexion_combo.grid(row=6, column=1, pady=5, padx=(10, 0))
+        
+        # Nota informativa
+        info_frame = ttk.Frame(main_frame)
+        info_frame.grid(row=7, column=0, columnspan=2, pady=(20, 0), sticky="ew")
+        
+        nota_label = ttk.Label(info_frame, text="Nota: Después de crear el control, podrás configurar las consultas y parámetros.", 
+                              foreground="gray", font=("Arial", 8))
+        nota_label.grid(row=0, column=0, columnspan=2, sticky="w")
+        
+        # Botones
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.grid(row=8, column=0, columnspan=2, pady=20)
         
         ttk.Button(buttons_frame, text="Crear", command=self.create_control).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Cancelar", command=self.cancel).pack(side="left", padx=5)
         
-    def create_control(self):
-        """Crea el control (simplificado)"""
-        messagebox.showinfo("Info", "Funcionalidad de control simplificada")
-        self.dialog.destroy()
+        # Configurar grid
+        main_frame.columnconfigure(1, weight=1)
         
+        # Cargar lista de conexiones
+        self._cargar_conexiones()
+        
+    def _cargar_conexiones(self):
+        """Carga la lista de conexiones disponibles"""
+        try:
+            # Obtener conexiones reales desde el controlador
+            if self.conexion_ctrl:
+                response = self.conexion_ctrl.obtener_todas()
+                if response.get('success', False):
+                    conexiones_bd = response.get('data', [])
+                    self.conexiones_disponibles = []
+                    
+                    for conn in conexiones_bd:
+                        self.conexiones_disponibles.append({
+                            "id": conn.get('id'),
+                            "nombre": f"{conn.get('nombre')} ({conn.get('motor')}) (ID: {conn.get('id')})"
+                        })
+                else:
+                    # Fallback si no se pueden obtener las conexiones
+                    self.conexiones_disponibles = [{"id": 1, "nombre": "Conexión no disponible (ID: 1)"}]
+            else:
+                # Fallback si no hay controlador de conexiones
+                self.conexiones_disponibles = [{"id": 1, "nombre": "Sin controlador de conexiones (ID: 1)"}]
+            
+            # Configurar valores del combobox
+            valores_combo = [f"{conn['nombre']}" for conn in self.conexiones_disponibles]
+            self.conexion_combo['values'] = valores_combo
+            
+            # Seleccionar la primera conexión por defecto
+            if valores_combo:
+                self.conexion_combo.current(0)
+            
+            print(f"DEBUG CreateControlDialog - Conexiones cargadas: {self.conexiones_disponibles}")
+            
+        except Exception as e:
+            print(f"Error cargando conexiones: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback
+            self.conexiones_disponibles = [{"id": 1, "nombre": "Error al cargar conexiones (ID: 1)"}]
+            self.conexion_combo['values'] = ["Error al cargar conexiones (ID: 1)"]
+            self.conexion_combo.current(0)
+    
+    def create_control(self):
+        """Crea el control"""
+        try:
+            nombre = self.nombre_var.get().strip()
+            descripcion = self.descripcion_text.get("1.0", "end-1c").strip()
+            activo = self.activo_var.get()
+            disparar_si_hay_datos = self.disparo_var.get() == "true"
+            
+            if not nombre:
+                messagebox.showerror("Error", "El nombre es obligatorio")
+                return
+            
+            # Obtener ID de conexión seleccionada
+            conexion_id = None
+            conexion_seleccionada_idx = self.conexion_combo.current()
+            if conexion_seleccionada_idx >= 0 and conexion_seleccionada_idx < len(self.conexiones_disponibles):
+                conexion_id = self.conexiones_disponibles[conexion_seleccionada_idx]['id']
+            
+            if not conexion_id:
+                messagebox.showerror("Error", "Debe seleccionar una conexión")
+                return
+            
+            # Crear diccionario de datos para el controlador
+            datos_control = {
+                'nombre': nombre,
+                'descripcion': descripcion,
+                'conexion_id': conexion_id,
+                'consulta_disparo_id': None,  # Se configurará después
+                'consultas_a_disparar_ids': [],  # Lista vacía inicialmente
+                'parametros_ids': [],
+                'referentes_ids': [],
+                'disparar_si_hay_datos': disparar_si_hay_datos,
+                'activo': activo,
+                'usuario_creador_id': 1  # Valor por defecto
+            }
+            
+            print(f"DEBUG CreateControlDialog - Enviando datos: {datos_control}")
+            
+            # Llamar al controlador con el diccionario
+            response = self.control_ctrl.crear_control(datos_control)
+            
+            if response.get('success', False):
+                self.result = response['data']
+                messagebox.showinfo("Éxito", "Control creado exitosamente")
+                self.dialog.destroy()
+            else:
+                error_msg = response.get('error', 'Error desconocido al crear control')
+                messagebox.showerror("Error", f"Error al crear control: {error_msg}")
+                print(f"ERROR CreateControlDialog - {error_msg}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error inesperado: {str(e)}")
+            print(f"ERROR CreateControlDialog - Excepción: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def cancel(self):
         """Cancela la operación"""
         self.dialog.destroy()

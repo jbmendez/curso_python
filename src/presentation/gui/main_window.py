@@ -16,6 +16,7 @@ from src.infrastructure.repositories.sqlite_consulta_repository import SQLiteCon
 from src.infrastructure.repositories.sqlite_consulta_control_repository import SQLiteConsultaControlRepository
 from src.infrastructure.repositories.sqlite_conexion_repository import SQLiteConexionRepository
 from src.infrastructure.repositories.sqlite_referente_repository import SQLiteReferenteRepository
+from src.infrastructure.repositories.sqlite_control_referente_repository import SQLiteControlReferenteRepository
 from src.infrastructure.repositories.sqlite_resultado_ejecucion_repository import SQLiteResultadoEjecucionRepository
 
 from src.domain.services.usuario_service import UsuarioService
@@ -48,6 +49,9 @@ from src.application.use_cases.crear_conexion_use_case import CrearConexionUseCa
 from src.application.use_cases.actualizar_conexion_use_case import ActualizarConexionUseCase
 from src.application.use_cases.listar_conexiones_use_case import ListarConexionesUseCase
 from src.application.use_cases.crear_referente_use_case import CrearReferenteUseCase
+from src.application.use_cases.listar_referentes_use_case import ListarReferentesUseCase
+from src.application.use_cases.actualizar_referente_use_case import ActualizarReferenteUseCase
+from src.application.use_cases.eliminar_referente_use_case import EliminarReferenteUseCase
 from src.application.use_cases.ejecutar_control_use_case import EjecutarControlUseCase
 from src.application.use_cases.obtener_historial_ejecucion_use_case import ObtenerHistorialEjecucionUseCase
 
@@ -58,9 +62,11 @@ from src.presentation.controllers.consulta_controller import ConsultaController
 from src.presentation.controllers.consulta_control_controller import ConsultaControlController
 from src.presentation.controllers.conexion_controller import ConexionController
 from src.presentation.controllers.referente_controller import ReferenteController
+from src.presentation.controllers.control_referente_controller import ControlReferenteController
 from src.presentation.controllers.ejecucion_controller import EjecucionController
 
 from src.presentation.gui.dialogs import CreateConnectionDialog, EditConnectionDialog, CreateControlDialog, EditControlDialog, ExecutionParametersDialog
+from src.presentation.gui.referente_dialogs import ReferentesListDialog, ControlReferentesDialog
 
 
 class MainWindow:
@@ -96,6 +102,7 @@ class MainWindow:
         consulta_repo = SQLiteConsultaRepository(self.db_path)
         consulta_control_repo = SQLiteConsultaControlRepository(self.db_path)
         referente_repo = SQLiteReferenteRepository(self.db_path)
+        control_referente_repo = SQLiteControlReferenteRepository(self.db_path)
         resultado_repo = SQLiteResultadoEjecucionRepository(self.db_path)
         
         # Servicios
@@ -127,6 +134,9 @@ class MainWindow:
         desasociar_consulta_control_uc = DesasociarConsultaControlUseCase(consulta_control_repo)
         establecer_consulta_disparo_uc = EstablecerConsultaDisparoUseCase(consulta_control_repo)
         crear_referente_uc = CrearReferenteUseCase(referente_repo)
+        listar_referentes_uc = ListarReferentesUseCase(referente_repo)
+        actualizar_referente_uc = ActualizarReferenteUseCase(referente_repo)
+        eliminar_referente_uc = EliminarReferenteUseCase(referente_repo)
         ejecutar_control_uc = EjecutarControlUseCase(control_repo, conexion_repo, resultado_repo, ejecucion_service)
         historial_uc = ObtenerHistorialEjecucionUseCase(resultado_repo, control_repo)
         
@@ -140,7 +150,13 @@ class MainWindow:
             asociar_consulta_control_uc, listar_consulta_control_uc, 
             desasociar_consulta_control_uc, establecer_consulta_disparo_uc
         )
-        self.referente_ctrl = ReferenteController(crear_referente_uc)
+        self.referente_ctrl = ReferenteController(
+            crear_referente_uc, listar_referentes_uc, actualizar_referente_uc, 
+            eliminar_referente_uc, referente_repo, control_referente_repo
+        )
+        self.control_referente_ctrl = ControlReferenteController(
+            control_referente_repo, control_repo, referente_repo
+        )
         self.ejecucion_ctrl = EjecucionController(ejecutar_control_uc, historial_uc)
         
     def create_widgets(self):
@@ -178,6 +194,8 @@ class MainWindow:
         file_menu.add_command(label="Nuevo Control", command=self.new_control)
         file_menu.add_command(label="Nueva Conexión", command=self.new_connection)
         file_menu.add_separator()
+        file_menu.add_command(label="Gestionar Referentes", command=self.manage_referentes)
+        file_menu.add_separator()
         file_menu.add_command(label="Salir", command=self.root.quit)
         
         # Menú Herramientas
@@ -203,6 +221,7 @@ class MainWindow:
         ttk.Button(buttons_frame, text="Nuevo Control", command=self.new_control).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Editar Control", command=self.edit_control).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Gestionar Consultas", command=self.manage_control_consultas).pack(side="left", padx=5)
+        ttk.Button(buttons_frame, text="Gestionar Referentes", command=self.manage_control_referentes).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Eliminar Control", command=self.delete_control).pack(side="left", padx=5)
         ttk.Button(buttons_frame, text="Actualizar", command=self.refresh_controls).pack(side="left", padx=5)
         
@@ -490,7 +509,7 @@ class MainWindow:
     
     def new_control(self):
         """Abre ventana para crear nuevo control"""
-        dialog = CreateControlDialog(self.root, self.control_ctrl, self.conexion_ctrl, self.usuario_ctrl)
+        dialog = CreateControlDialog(self.root, self.control_ctrl, self.conexion_ctrl)
         self.root.wait_window(dialog.dialog)
         
         if dialog.result:
@@ -1308,6 +1327,47 @@ Mensaje: {mensaje}"""
         self.filter_estado.set("Todos")
         self.refresh_history()
     
+    def manage_referentes(self):
+        """Abre el diálogo de gestión de referentes"""
+        try:
+            dialog = ReferentesListDialog(self.root, self.referente_ctrl, self.control_referente_ctrl)
+            self.root.wait_window(dialog.dialog)
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al abrir gestión de referentes: {str(e)}")
+    
+    def manage_control_referentes(self):
+        """Abre el diálogo de gestión de referentes para el control seleccionado"""
+        try:
+            selection = self.controls_tree.selection()
+            if not selection:
+                messagebox.showwarning("Advertencia", "Seleccione un control para gestionar sus referentes")
+                return
+            
+            # Obtener datos del control seleccionado
+            item = self.controls_tree.item(selection[0])
+            control_id = item['values'][0]
+            control_nombre = item['values'][1]
+            control_descripcion = item['values'][2]
+            
+            # Crear diccionario con datos del control
+            control_data = {
+                'id': control_id,
+                'nombre': control_nombre,
+                'descripcion': control_descripcion
+            }
+            
+            # Abrir diálogo de gestión de referentes del control
+            dialog = ControlReferentesDialog(
+                self.root, 
+                control_data, 
+                self.control_referente_ctrl, 
+                self.referente_ctrl
+            )
+            self.root.wait_window(dialog.dialog)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al gestionar referentes del control: {str(e)}")
+
     def show_about(self):
         """Muestra información sobre la aplicación"""
         messagebox.showinfo(

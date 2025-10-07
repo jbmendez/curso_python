@@ -10,15 +10,13 @@ import re
 
 @dataclass
 class Referente:
-    """Entidad Referente - Representa un referente para notificaciones"""
+    """Entidad Referente - Representa un referente para reportes"""
     
     id: Optional[int] = None
     nombre: str = ""
     email: str = ""
-    carpeta_red: str = ""
+    path_archivos: str = ""  # Ruta donde dejar archivos de reportes
     activo: bool = True
-    notificar_por_email: bool = True
-    notificar_por_archivo: bool = False
     
     def es_email_valido(self) -> bool:
         """Valida el formato del email"""
@@ -27,19 +25,18 @@ class Referente:
         patron = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         return bool(re.match(patron, self.email))
     
-    def es_carpeta_valida(self) -> bool:
-        """Valida que la carpeta de red sea válida si está configurada"""
-        if self.notificar_por_archivo and not self.carpeta_red.strip():
+    def es_path_valido(self) -> bool:
+        """Valida que el path de archivos sea válido"""
+        if not self.path_archivos.strip():
             return False
-        return True
+        # Validación básica de path (podría ser más específica según el OS)
+        return len(self.path_archivos.strip()) > 0
     
-    def debe_notificar_email(self) -> bool:
-        """Verifica si debe notificar por email"""
-        return self.activo and self.notificar_por_email and self.es_email_valido()
-    
-    def debe_notificar_archivo(self) -> bool:
-        """Verifica si debe notificar por archivo"""
-        return self.activo and self.notificar_por_archivo and self.es_carpeta_valida()
+    def es_valido(self) -> bool:
+        """Validación general del referente"""
+        return (self.nombre and self.nombre.strip() and 
+                self.es_email_valido() and 
+                self.es_path_valido())
     
     def __str__(self) -> str:
         return f"Referente(nombre={self.nombre}, email={self.email})"

@@ -43,7 +43,7 @@ class Control:
     referentes: List[Referente] = field(default_factory=list)
     
     def es_configuracion_valida(self) -> bool:
-        """Valida que el control tenga una configuración válida"""
+        """Valida que el control tenga una configuración válida para ejecución"""
         if not self.nombre.strip():
             return False
         
@@ -54,6 +54,16 @@ class Control:
             return False
             
         if not self.consultas_a_disparar_ids:
+            return False
+            
+        return True
+    
+    def es_configuracion_basica_valida(self) -> bool:
+        """Valida configuración mínima para creación de control"""
+        if not self.nombre.strip():
+            return False
+        
+        if not self.conexion_id:
             return False
             
         return True

@@ -22,12 +22,30 @@ class SQLiteReferenteRepository(ReferenteRepository):
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     nombre TEXT NOT NULL,
                     email TEXT UNIQUE NOT NULL,
-                    carpeta_red TEXT,
-                    activo BOOLEAN DEFAULT 1,
-                    notificar_por_email BOOLEAN DEFAULT 1,
-                    notificar_por_archivo BOOLEAN DEFAULT 0
+                    path_archivos TEXT,
+                    activo BOOLEAN DEFAULT 1
                 )
             """)
+            
+            # Migrar datos si es necesario
+            cursor = conn.execute("PRAGMA table_info(referentes)")
+            columnas = [col[1] for col in cursor.fetchall()]
+            
+            # Si existe carpeta_red pero no path_archivos, migrar
+            if 'carpeta_red' in columnas and 'path_archivos' not in columnas:
+                try:
+                    conn.execute("ALTER TABLE referentes ADD COLUMN path_archivos TEXT")
+                    conn.execute("UPDATE referentes SET path_archivos = carpeta_red")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column name" not in str(e):
+                        raise
+            # Si no existe path_archivos (tabla nueva), agregarla
+            elif 'path_archivos' not in columnas:
+                try:
+                    conn.execute("ALTER TABLE referentes ADD COLUMN path_archivos TEXT")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column name" not in str(e):
+                        raise
     
     def obtener_por_id(self, id: int) -> Optional[Referente]:
         """Obtiene un referente por su ID"""
@@ -98,21 +116,18 @@ class SQLiteReferenteRepository(ReferenteRepository):
                 # Crear nuevo referente
                 cursor = conn.execute(
                     """INSERT INTO referentes 
-                       (nombre, email, carpeta_red, activo, notificar_por_email, notificar_por_archivo) 
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (referente.nombre, referente.email, referente.carpeta_red, referente.activo,
-                     referente.notificar_por_email, referente.notificar_por_archivo)
+                       (nombre, email, path_archivos, activo) 
+                       VALUES (?, ?, ?, ?)""",
+                    (referente.nombre, referente.email, referente.path_archivos, referente.activo)
                 )
                 referente.id = cursor.lastrowid
             else:
                 # Actualizar referente existente
                 conn.execute(
                     """UPDATE referentes 
-                       SET nombre=?, email=?, carpeta_red=?, activo=?, 
-                           notificar_por_email=?, notificar_por_archivo=? 
+                       SET nombre=?, email=?, path_archivos=?, activo=? 
                        WHERE id=?""",
-                    (referente.nombre, referente.email, referente.carpeta_red, referente.activo,
-                     referente.notificar_por_email, referente.notificar_por_archivo, referente.id)
+                    (referente.nombre, referente.email, referente.path_archivos, referente.activo, referente.id)
                 )
             
             return referente
@@ -129,8 +144,6 @@ class SQLiteReferenteRepository(ReferenteRepository):
             id=row['id'],
             nombre=row['nombre'],
             email=row['email'],
-            carpeta_red=row['carpeta_red'] or "",
-            activo=bool(row['activo']),
-            notificar_por_email=bool(row['notificar_por_email']),
-            notificar_por_archivo=bool(row['notificar_por_archivo'])
+            path_archivos=row['path_archivos'] if 'path_archivos' in row.keys() else (row.get('carpeta_red') or ""),
+            activo=bool(row['activo'])
         )
