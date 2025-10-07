@@ -146,9 +146,16 @@ class EjecucionControlService:
                     resultado_disparo
                 )
             
-            # Evaluar si el control se dispara
+            # Evaluar si el control se dispara basado en su configuración
             filas_disparo = resultado_disparo.filas_afectadas
-            control_se_dispara = filas_disparo > 0
+            
+            # Aplicar lógica de disparo según configuración del control
+            if control.disparar_si_hay_datos:
+                # Disparar cuando HAY datos (filas > 0)
+                control_se_dispara = filas_disparo > 0
+            else:
+                # Disparar cuando NO hay datos (filas == 0)
+                control_se_dispara = filas_disparo == 0
             
             resultados_disparadas = []
             total_filas_disparadas = 0
@@ -173,7 +180,7 @@ class EjecucionControlService:
             estado = self._determinar_estado(control_se_dispara, filas_disparo, resultados_disparadas)
             
             # Crear mensaje
-            mensaje = self._crear_mensaje(estado, filas_disparo, total_filas_disparadas, ejecutar_solo_disparo)
+            mensaje = self._crear_mensaje(control, estado, filas_disparo, total_filas_disparadas, ejecutar_solo_disparo)
             
             tiempo_total = (time.time() - inicio_tiempo) * 1000  # en millisegundos
             
@@ -300,19 +307,16 @@ class EjecucionControlService:
         if any(r.error for r in resultados_disparadas):
             return EstadoEjecucion.ERROR
         
-        # Si no se dispara
-        if not control_se_dispara or filas_disparo == 0:
-            return EstadoEjecucion.SIN_DATOS
-        
-        # Si se dispara
+        # Si el control se dispara (ya considerando la configuración disparar_si_hay_datos)
         if control_se_dispara:
             return EstadoEjecucion.CONTROL_DISPARADO
         
-        # Ejecución exitosa sin disparo
-        return EstadoEjecucion.EXITOSO
+        # Si no se dispara (independientemente del número de filas)
+        return EstadoEjecucion.SIN_DATOS
     
     def _crear_mensaje(
         self, 
+        control: Control,
         estado: EstadoEjecucion, 
         filas_disparo: int, 
         total_filas_disparadas: int,
@@ -322,12 +326,17 @@ class EjecucionControlService:
         if estado == EstadoEjecucion.ERROR:
             return "Error durante la ejecución del control"
         elif estado == EstadoEjecucion.SIN_DATOS:
-            return f"Control ejecutado exitosamente. No se encontraron datos ({filas_disparo} filas)"
+            if control.disparar_si_hay_datos:
+                return f"Control no disparado. Consulta de disparo no encontró datos ({filas_disparo} filas)"
+            else:
+                return f"Control no disparado. Consulta de disparo encontró datos ({filas_disparo} filas)"
         elif estado == EstadoEjecucion.CONTROL_DISPARADO:
             if ejecutar_solo_disparo:
-                return f"Consulta de disparo ejecutada: {filas_disparo} filas encontradas"
+                condicion = "sin datos" if not control.disparar_si_hay_datos else "con datos"
+                return f"Consulta de disparo ejecutada: {filas_disparo} filas ({condicion})"
             else:
-                return f"Control disparado: {filas_disparo} filas de disparo, {total_filas_disparadas} filas procesadas"
+                condicion = "sin datos" if not control.disparar_si_hay_datos else "con datos"
+                return f"Control disparado ({condicion}): {filas_disparo} filas de disparo, {total_filas_disparadas} filas procesadas"
         else:
             return "Control ejecutado exitosamente"
     
