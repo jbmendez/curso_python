@@ -183,6 +183,28 @@ class MainWindow:
         # Pestaña de historial
         self.create_history_tab(notebook)
         
+        # Cargar datos iniciales
+        self.load_initial_data()
+        
+    def load_initial_data(self):
+        """Carga todos los datos iniciales de la aplicación"""
+        try:
+            # Cargar controles (usado en múltiples lugares)
+            self.refresh_controls()
+            self.refresh_execution_controls()
+            
+            # Cargar filtros de historial
+            self.load_filter_controls()
+            
+            # Cargar historial
+            self.refresh_history()
+            
+            print("DEBUG - Datos iniciales cargados exitosamente")
+        except Exception as e:
+            print(f"DEBUG - Error cargando datos iniciales: {e}")
+            import traceback
+            traceback.print_exc()
+        
     def create_menu(self):
         """Crea la barra de menú"""
         menubar = tk.Menu(self.root)
@@ -364,13 +386,15 @@ class MainWindow:
         ttk.Label(filters_frame, text="Control:").grid(row=0, column=0, padx=5, pady=5)
         self.filter_control = ttk.Combobox(filters_frame, width=20)
         self.filter_control.grid(row=0, column=1, padx=5, pady=5)
+        self.filter_control.bind('<<ComboboxSelected>>', self.filter_history)
         
         ttk.Label(filters_frame, text="Estado:").grid(row=0, column=2, padx=5, pady=5)
         self.filter_estado = ttk.Combobox(filters_frame, values=["Todos", "EXITOSO", "ERROR", "CONTROL_DISPARADO", "SIN_DATOS"])
         self.filter_estado.set("Todos")
         self.filter_estado.grid(row=0, column=3, padx=5, pady=5)
+        self.filter_estado.bind('<<ComboboxSelected>>', self.filter_history)
         
-        ttk.Button(filters_frame, text="Filtrar", command=self.filter_history).grid(row=0, column=4, padx=5, pady=5)
+        ttk.Button(filters_frame, text="Filtrar", command=lambda: self.filter_history()).grid(row=0, column=4, padx=5, pady=5)
         ttk.Button(filters_frame, text="Limpiar", command=self.clear_filters).grid(row=0, column=5, padx=5, pady=5)
         
         # Lista de historial
@@ -392,6 +416,45 @@ class MainWindow:
         
         # Cargar historial inicial
         self.refresh_history()
+        
+    def load_filter_controls(self):
+        """Carga los controles disponibles en el combo de filtro"""
+        try:
+            response = self.control_ctrl.obtener_todas()
+            
+            if response.get('success', False):
+                controles = response.get('data', [])
+                
+                # Crear lista de nombres para el combo
+                control_names = ["Todos"]  # Opción para mostrar todos
+                control_mapping = {"Todos": None}  # Mapeo nombre -> ID
+                
+                for control in controles:
+                    nombre = control.get('nombre', f"Control ID {control.get('id', 'N/A')}")
+                    control_names.append(nombre)
+                    control_mapping[nombre] = control.get('id')
+                
+                # Configurar valores del combo
+                self.filter_control['values'] = control_names
+                self.filter_control.set("Todos")  # Seleccionar "Todos" por defecto
+                
+                # Guardar el mapeo para uso posterior en filtros
+                self.control_filter_mapping = control_mapping
+                
+                print(f"DEBUG - Controles cargados en filtro: {len(controles)} controles")
+            else:
+                print(f"DEBUG - Error obteniendo controles para filtro: {response.get('error', 'Error desconocido')}")
+                self.filter_control['values'] = ["Todos"]
+                self.filter_control.set("Todos")
+                self.control_filter_mapping = {"Todos": None}
+                
+        except Exception as e:
+            print(f"DEBUG - Excepción en load_filter_controls: {e}")
+            import traceback
+            traceback.print_exc()
+            self.filter_control['values'] = ["Todos"]
+            self.filter_control.set("Todos")
+            self.control_filter_mapping = {"Todos": None}
         
     def refresh_controls(self):
         """Actualiza la lista de controles"""
@@ -490,20 +553,116 @@ class MainWindow:
             self.history_tree.delete(item)
         
         try:
-            # TODO: Implementar cuando exista controlador de historial
-            # Por ahora, agregar datos de ejemplo
-            import datetime
-            ejemplo_datos = [
-                (1, "Control Ventas", datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                 "EXITOSO", "250.5", "1500", "Ejecución completada"),
-                (2, "Control Inventario", datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                 "ERROR", "120.0", "0", "Error de conexión"),
-            ]
+            # Obtener historial real desde el controlador
+            response = self.ejecucion_ctrl.obtener_historial(
+                limite=100,  # Últimas 100 ejecuciones
+                incluir_detalles=False
+            )
             
-            for dato in ejemplo_datos:
-                self.history_tree.insert("", "end", values=dato)
+            if response.get('success', False):
+                historial_data = response.get('data', [])
+                
+                for ejecucion in historial_data:
+                    # Formatear fecha para mostrar
+                    fecha_str = ""
+                    try:
+                        from datetime import datetime
+                        fecha = datetime.fromisoformat(ejecucion['fecha_ejecucion'].replace('Z', '+00:00'))
+                        fecha_str = fecha.strftime("%Y-%m-%d %H:%M:%S")
+                    except:
+                        fecha_str = ejecucion.get('fecha_ejecucion', '')[:19]
+                    
+                    # Formatear estado para mostrar
+                    estado = ejecucion.get('estado', '').upper()
+                    
+                    valores = (
+                        ejecucion.get('id', ''),
+                        ejecucion.get('control_nombre', 'N/A'),
+                        fecha_str,
+                        estado,
+                        f"{ejecucion.get('tiempo_total_ejecucion_ms', 0):.1f}",
+                        ejecucion.get('total_filas_disparadas', 0),
+                        ejecucion.get('mensaje', '')[:50] + "..." if len(ejecucion.get('mensaje', '')) > 50 else ejecucion.get('mensaje', '')
+                    )
+                    
+                    self.history_tree.insert("", "end", values=valores)
+                    
+                print(f"DEBUG - Historial cargado: {len(historial_data)} ejecuciones")
+            else:
+                error_msg = response.get('error', 'Error al obtener historial')
+                print(f"DEBUG - Error obteniendo historial: {error_msg}")
+                # Si hay error, mostrar mensaje en el historial
+                self.history_tree.insert("", "end", values=("", "Error", "", "ERROR", "", "", error_msg))
+                
         except Exception as e:
-            messagebox.showerror("Error", f"Error al cargar historial: {str(e)}")
+            print(f"DEBUG - Excepción en refresh_history: {e}")
+            import traceback
+            traceback.print_exc()
+            # Si hay excepción, mostrar mensaje en el historial
+            self.history_tree.insert("", "end", values=("", "Error", "", "ERROR", "", "", f"Error: {str(e)}"))
+    
+    def filter_history(self, event=None):
+        """Filtra el historial según los criterios seleccionados"""
+        try:
+            # Obtener valores de los filtros
+            selected_control = self.filter_control.get()
+            selected_estado = self.filter_estado.get()
+            
+            print(f"DEBUG - Filtrando historial: Control={selected_control}, Estado={selected_estado}")
+            
+            # Obtener el ID del control seleccionado
+            control_id = None
+            if hasattr(self, 'control_filter_mapping') and selected_control in self.control_filter_mapping:
+                control_id = self.control_filter_mapping[selected_control]
+            
+            # Preparar estado para el filtro
+            estado = None
+            if selected_estado and selected_estado != "Todos":
+                estado = selected_estado
+            
+            # Limpiar la vista
+            for item in self.history_tree.get_children():
+                self.history_tree.delete(item)
+            
+            # Obtener historial con filtros
+            response = self.ejecucion_ctrl.obtener_historial(
+                control_id=control_id,
+                estado=estado,
+                limite=100  # Aumentar límite para ver más resultados
+            )
+            
+            if response.get('success', False):
+                historial_data = response.get('data', [])
+                
+                for ejecucion in historial_data:
+                    self.history_tree.insert("", "end", values=(
+                        ejecucion.get('id', ''),
+                        ejecucion.get('control_nombre', ''),
+                        ejecucion.get('fecha_ejecucion', ''),
+                        ejecucion.get('estado', ''),
+                        ejecucion.get('tiempo_ejecucion_ms', ''),
+                        ejecucion.get('filas_disparo', ''),
+                        ejecucion.get('mensaje', '')
+                    ))
+                
+                print(f"DEBUG - Historial filtrado: {len(historial_data)} ejecuciones")
+            else:
+                print(f"DEBUG - Error filtrando historial: {response.get('error', '')}")
+                
+        except Exception as e:
+            print(f"DEBUG - Error en filter_history: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def clear_filters(self):
+        """Limpia todos los filtros y recarga el historial completo"""
+        try:
+            self.filter_control.set("Todos")
+            self.filter_estado.set("Todos")
+            self.refresh_history()
+            print("DEBUG - Filtros limpiados")
+        except Exception as e:
+            print(f"DEBUG - Error limpiando filtros: {e}")
     
     # ===== MÉTODOS DE EVENTOS =====
     
@@ -1317,11 +1476,7 @@ Mensaje: {mensaje}"""
         """Placeholder para ver historial desde menú"""
         messagebox.showinfo("Función", "Ir a pestaña Historial para ver ejecuciones")
     
-    def filter_history(self):
-        """Filtra el historial según los criterios seleccionados"""
-        messagebox.showinfo("Función", "Filtrar historial - Por implementar")
-    
-    def clear_filters(self):
+    def clear_filters_old(self):
         """Limpia los filtros del historial"""
         self.filter_control.set("")
         self.filter_estado.set("Todos")
