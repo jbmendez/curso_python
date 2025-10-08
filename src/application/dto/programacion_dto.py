@@ -39,9 +39,11 @@ class CrearProgramacionDTO:
 
 
 @dataclass
+@dataclass
 class ActualizarProgramacionDTO:
     """DTO para actualizar una programación existente"""
     id: int
+    control_id: int  # ← AGREGADO: control_id faltante
     nombre: str
     descripcion: str
     tipo_programacion: TipoProgramacion

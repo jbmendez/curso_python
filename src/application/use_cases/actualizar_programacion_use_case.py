@@ -34,6 +34,7 @@ class ActualizarProgramacionUseCase:
             raise ValueError(f"La programación con ID {dto.id} no existe")
         
         # Actualizar campos
+        programacion_existente.control_id = dto.control_id  # ← AGREGADO: actualizar control_id
         programacion_existente.nombre = dto.nombre
         programacion_existente.descripcion = dto.descripcion
         programacion_existente.tipo_programacion = dto.tipo_programacion
@@ -51,7 +52,7 @@ class ActualizarProgramacionUseCase:
         
         # Validar nombre único para el control (excluyendo la programación actual)
         programaciones_control = self.programacion_repository.obtener_por_control_id(
-            programacion_existente.control_id
+            dto.control_id  # ← CAMBIADO: usar el nuevo control_id del DTO
         )
         nombres_existentes = [
             p.nombre.lower() for p in programaciones_control 

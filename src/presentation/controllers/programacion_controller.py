@@ -165,7 +165,7 @@ class ProgramacionController:
         """
         try:
             # Validar datos requeridos
-            campos_requeridos = ['id', 'nombre', 'descripcion', 'tipo_programacion']
+            campos_requeridos = ['id', 'control_id', 'nombre', 'descripcion', 'tipo_programacion']
             for campo in campos_requeridos:
                 if campo not in datos or (campo != 'id' and not datos[campo]):
                     return {
@@ -212,6 +212,7 @@ class ProgramacionController:
             from ...application.dto.programacion_dto import ActualizarProgramacionDTO
             dto = ActualizarProgramacionDTO(
                 id=int(datos['id']),
+                control_id=int(datos['control_id']),  # ← AGREGADO: control_id faltante
                 nombre=datos['nombre'].strip(),
                 descripcion=datos['descripcion'].strip(),
                 tipo_programacion=tipo_programacion,

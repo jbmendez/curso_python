@@ -639,12 +639,16 @@ class ProgramacionesWindow:
             return
         
         try:
+            # Extraer ID del control
+            control_id = int(self.control_var.get().split(" - ")[0])
+            
             # Extraer tipo de programación
             tipo = self.tipo_var.get().split(" - ")[0].lower()
             
             # Preparar datos para actualización
             datos = {
                 'id': self.programacion_editando['id'],
+                'control_id': control_id,  # ← AGREGADO: control_id faltante
                 'nombre': self.nombre_var.get().strip(),
                 'descripcion': self.descripcion_var.get().strip(),
                 'tipo_programacion': tipo,

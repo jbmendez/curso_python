@@ -10,7 +10,7 @@ echo ☕ Java 11 configurado
 echo 🚀 Iniciando GUI del Sistema de Controles...
 echo.
 
-REM Ejecutar la GUI
-"%~dp0.venv\Scripts\python.exe" main_gui.py
+REM Ejecutar la GUI usando py del sistema (no virtual env)
+py main_gui.py
 
 pause
