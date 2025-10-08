@@ -18,6 +18,7 @@ from src.infrastructure.repositories.sqlite_conexion_repository import SQLiteCon
 from src.infrastructure.repositories.sqlite_referente_repository import SQLiteReferenteRepository
 from src.infrastructure.repositories.sqlite_control_referente_repository import SQLiteControlReferenteRepository
 from src.infrastructure.repositories.sqlite_resultado_ejecucion_repository import SQLiteResultadoEjecucionRepository
+from src.infrastructure.repositories.sqlite_programacion_repository import SQLiteProgramacionRepository
 
 from src.domain.services.usuario_service import UsuarioService
 from src.domain.services.control_service import ControlService
@@ -54,6 +55,11 @@ from src.application.use_cases.actualizar_referente_use_case import ActualizarRe
 from src.application.use_cases.eliminar_referente_use_case import EliminarReferenteUseCase
 from src.application.use_cases.ejecutar_control_use_case import EjecutarControlUseCase
 from src.application.use_cases.obtener_historial_ejecucion_use_case import ObtenerHistorialEjecucionUseCase
+from src.application.use_cases.crear_programacion_use_case import CrearProgramacionUseCase
+from src.application.use_cases.listar_programaciones_use_case import ListarProgramacionesUseCase
+from src.application.use_cases.actualizar_programacion_use_case import ActualizarProgramacionUseCase
+from src.application.use_cases.eliminar_programacion_use_case import EliminarProgramacionUseCase
+from src.application.use_cases.activar_desactivar_programacion_use_case import ActivarDesactivarProgramacionUseCase
 
 from src.presentation.controllers.usuario_controller import UsuarioController
 from src.presentation.controllers.control_controller import ControlController
@@ -64,6 +70,7 @@ from src.presentation.controllers.conexion_controller import ConexionController
 from src.presentation.controllers.referente_controller import ReferenteController
 from src.presentation.controllers.control_referente_controller import ControlReferenteController
 from src.presentation.controllers.ejecucion_controller import EjecucionController
+from src.presentation.controllers.programacion_controller import ProgramacionController
 
 from src.presentation.gui.dialogs import CreateConnectionDialog, EditConnectionDialog, CreateControlDialog, EditControlDialog, ExecutionParametersDialog
 from src.presentation.gui.referente_dialogs import ReferentesListDialog, ControlReferentesDialog
@@ -104,6 +111,7 @@ class MainWindow:
         referente_repo = SQLiteReferenteRepository(self.db_path)
         control_referente_repo = SQLiteControlReferenteRepository(self.db_path)
         resultado_repo = SQLiteResultadoEjecucionRepository(self.db_path)
+        programacion_repo = SQLiteProgramacionRepository(self.db_path)
         
         # Servicios
         usuario_service = UsuarioService(usuario_repo)
@@ -140,6 +148,13 @@ class MainWindow:
         ejecutar_control_uc = EjecutarControlUseCase(control_repo, conexion_repo, resultado_repo, ejecucion_service)
         historial_uc = ObtenerHistorialEjecucionUseCase(resultado_repo, control_repo)
         
+        # Use cases de programaciones
+        crear_programacion_uc = CrearProgramacionUseCase(programacion_repo, control_repo)
+        listar_programaciones_uc = ListarProgramacionesUseCase(programacion_repo, control_repo)
+        actualizar_programacion_uc = ActualizarProgramacionUseCase(programacion_repo)
+        eliminar_programacion_uc = EliminarProgramacionUseCase(programacion_repo)
+        activar_desactivar_programacion_uc = ActivarDesactivarProgramacionUseCase(programacion_repo)
+        
         # Controladores
         self.usuario_ctrl = UsuarioController(registrar_usuario_uc)
         self.conexion_ctrl = ConexionController(crear_conexion_uc, listar_conexiones_uc, actualizar_conexion_uc)
@@ -158,6 +173,10 @@ class MainWindow:
             control_referente_repo, control_repo, referente_repo
         )
         self.ejecucion_ctrl = EjecucionController(ejecutar_control_uc, historial_uc)
+        self.programacion_ctrl = ProgramacionController(
+            crear_programacion_uc, listar_programaciones_uc, actualizar_programacion_uc,
+            eliminar_programacion_uc, activar_desactivar_programacion_uc
+        )
         
     def create_widgets(self):
         """Crea la interfaz gráfica"""
@@ -217,6 +236,7 @@ class MainWindow:
         file_menu.add_command(label="Nueva Conexión", command=self.new_connection)
         file_menu.add_separator()
         file_menu.add_command(label="Gestionar Referentes", command=self.manage_referentes)
+        file_menu.add_command(label="Gestionar Programaciones", command=self.manage_programaciones)
         file_menu.add_separator()
         file_menu.add_command(label="Salir", command=self.root.quit)
         
@@ -1574,6 +1594,12 @@ Mensaje: {mensaje}"""
         )
         
         print(f"✅ Servicios de conexión registrados: {ConexionTestFactory.tipos_soportados()}")
+    
+    def manage_programaciones(self):
+        """Abre la ventana de gestión de programaciones"""
+        from .programaciones_window import ProgramacionesWindow
+        programaciones_window = ProgramacionesWindow(self.root, self.programacion_ctrl, self.control_ctrl)
+        programaciones_window.show()
     
     def run(self):
         """Inicia la aplicación"""

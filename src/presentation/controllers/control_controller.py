@@ -165,17 +165,19 @@ class ControlController:
                     'nombre': control.nombre,
                     'descripcion': control.descripcion,
                     'activo': control.activo,
-                    'fecha_creacion': control.fecha_creacion.isoformat(),
+                    'fecha_creacion': control.fecha_creacion.isoformat() if control.fecha_creacion else None,
                     'disparar_si_hay_datos': control.disparar_si_hay_datos,
                     'conexion_id': control.conexion_id,
                     'consulta_disparo_id': control.consulta_disparo_id,
                     'consultas_a_disparar_ids': control.consultas_a_disparar_ids,
                     'parametros_ids': control.parametros_ids,
-                    'referentes_ids': control.referentes_ids
+                    'referentes_ids': control.referentes_ids,
+                    'tipo_motor': ''  # Por compatibilidad con la GUI existente
                 }
                 controles_data.append(control_data)
             
             return {
+                'success': True,
                 'data': controles_data,
                 'status': 200,
                 'message': f'Se encontraron {len(controles_data)} controles'
@@ -183,7 +185,9 @@ class ControlController:
             
         except Exception as e:
             return {
+                'success': False,
                 'error': 'Error interno del servidor',
+                'message': str(e),
                 'status': 500
             }
     

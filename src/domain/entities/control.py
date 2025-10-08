@@ -42,6 +42,9 @@ class Control:
     consultas_a_disparar: List[Consulta] = field(default_factory=list)
     referentes: List[Referente] = field(default_factory=list)
     
+    # Lista de programaciones (se carga desde repositorio)
+    programaciones: List = field(default_factory=list)  # List[Programacion] - evitamos import circular
+    
     def es_configuracion_valida(self) -> bool:
         """Valida que el control tenga una configuración válida para ejecución"""
         if not self.nombre.strip():
@@ -121,6 +124,49 @@ class Control:
         """Agrega un referente al control"""
         if referente_id not in self.referentes_ids:
             self.referentes_ids.append(referente_id)
+    
+    def tiene_programaciones_activas(self) -> bool:
+        """Verifica si el control tiene programaciones activas"""
+        return any(prog.activo for prog in self.programaciones)
+    
+    def obtener_programaciones_activas(self) -> List:
+        """Obtiene solo las programaciones activas del control"""
+        return [prog for prog in self.programaciones if prog.activo]
+    
+    def obtener_proxima_ejecucion_programada(self):
+        """Obtiene la fecha de la próxima ejecución programada"""
+        programaciones_activas = self.obtener_programaciones_activas()
+        if not programaciones_activas:
+            return None
+        
+        proximas_ejecuciones = [
+            prog.proxima_ejecucion 
+            for prog in programaciones_activas 
+            if prog.proxima_ejecucion
+        ]
+        
+        if not proximas_ejecuciones:
+            return None
+        
+        return min(proximas_ejecuciones)
+    
+    def debe_ejecutarse_automaticamente(self, fecha_actual: datetime = None) -> bool:
+        """
+        Verifica si el control debe ejecutarse automáticamente ahora
+        
+        Args:
+            fecha_actual: Fecha/hora actual (por defecto datetime.now())
+            
+        Returns:
+            bool: True si debe ejecutarse por alguna programación
+        """
+        if not self.activo or not self.puede_ejecutarse():
+            return False
+        
+        return any(
+            prog.debe_ejecutarse_ahora(fecha_actual) 
+            for prog in self.obtener_programaciones_activas()
+        )
     
     def __str__(self) -> str:
         return f"Control(id={self.id}, nombre={self.nombre}, activo={self.activo})"
