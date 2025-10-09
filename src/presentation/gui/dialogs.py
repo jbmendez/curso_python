@@ -240,8 +240,10 @@ class EditConnectionDialog:
             messagebox.showerror("Error", "La base de datos es obligatoria")
             return
             
-        if not self.usuario_var.get().strip():
-            messagebox.showerror("Error", "El usuario es obligatorio")
+        # Para SQL Server, el usuario es opcional (puede usar Trusted_Connection)
+        motor = self.motor_var.get()
+        if motor not in ['sqlserver', 'mssql'] and not self.usuario_var.get().strip():
+            messagebox.showerror("Error", "El usuario es obligatorio para este tipo de motor")
             return
         
         try:
@@ -284,13 +286,16 @@ class EditConnectionDialog:
             messagebox.showerror("Error", "La base de datos es obligatoria para probar la conexión")
             return
             
-        if not self.usuario_var.get().strip():
-            messagebox.showerror("Error", "El usuario es obligatorio para probar la conexión")
-            return
-        
-        if not self.password_var.get().strip():
-            messagebox.showerror("Error", "La contraseña es obligatoria para probar la conexión")
-            return
+        # Para SQL Server, usuario y contraseña son opcionales (puede usar Trusted_Connection)
+        motor = self.motor_var.get()
+        if motor not in ['sqlserver', 'mssql']:
+            if not self.usuario_var.get().strip():
+                messagebox.showerror("Error", "El usuario es obligatorio para probar la conexión")
+                return
+            
+            if not self.password_var.get().strip():
+                messagebox.showerror("Error", "La contraseña es obligatoria para probar la conexión")
+                return
         
         try:
             puerto = int(self.puerto_var.get())

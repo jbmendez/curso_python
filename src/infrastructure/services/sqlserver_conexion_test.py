@@ -137,14 +137,26 @@ class SQLServerConexionTest(ConexionTestService):
             # Fallback al driver genérico
             driver = "SQL Server"
         
-        connection_string = (
-            f"DRIVER={{{driver}}};"
-            f"SERVER={conexion.servidor},{conexion.puerto};"
-            f"DATABASE={conexion.base_datos};"
-            f"UID={conexion.usuario};"
-            f"PWD={conexion.contraseña};"
-            f"Trusted_Connection=no;"
-            f"Connection Timeout=10;"
-        )
+        # Determinar si usar autenticación Windows o SQL Server
+        if not conexion.usuario or not conexion.contraseña:
+            # Autenticación Windows (Trusted Connection)
+            connection_string = (
+                f"DRIVER={{{driver}}};"
+                f"SERVER={conexion.servidor},{conexion.puerto};"
+                f"DATABASE={conexion.base_datos};"
+                f"Trusted_Connection=yes;"
+                f"Connection Timeout=10;"
+            )
+        else:
+            # Autenticación SQL Server
+            connection_string = (
+                f"DRIVER={{{driver}}};"
+                f"SERVER={conexion.servidor},{conexion.puerto};"
+                f"DATABASE={conexion.base_datos};"
+                f"UID={conexion.usuario};"
+                f"PWD={conexion.contraseña};"
+                f"Trusted_Connection=no;"
+                f"Connection Timeout=10;"
+            )
         
         return connection_string

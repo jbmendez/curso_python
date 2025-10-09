@@ -1,11 +1,27 @@
-# Dependencias del proyecto
+# Dependencias principales del sistema de controles
+
+# === DEPENDENCIAS CRÍTICAS ===
+# Generación de archivos Excel
+openpyxl==3.0.9
+
+# Conexión JDBC a iSeries 
+jpype1==1.4.1
+jaydebeapi>=1.2.3       # IBM i Series JDBC (requiere jt400.jar)
+
+# === DEPENDENCIAS OPCIONALES ===
+# Para manejo avanzado de procesos (usado en gestionar_motor.py)
+psutil==5.9.4
+
+# Validación de emails (para referentes)
+email-validator==2.0.0
+
+# === DEPENDENCIAS DE DESARROLLO ===
 pytest>=7.0.0
 black>=22.0.0
 flake8>=4.0.0
 mypy>=0.950
 
-# Drivers de base de datos
+# === DRIVERS ADICIONALES (para otros motores de BD) ===
 psycopg2-binary>=2.9.0  # PostgreSQL
 pymysql>=1.0.0          # MySQL/MariaDB
-pyodbc>=4.0.0           # SQL Server e IBM i Series (requiere ODBC driver instalado en el sistema)
-jaydebeapi>=1.2.3       # IBM i Series JDBC (requiere jt400.jar descargado por separado)
+pyodbc>=4.0.0           # SQL Server
