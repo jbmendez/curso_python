@@ -15,6 +15,9 @@ psutil==5.9.4
 # Validación de emails (para referentes)
 email-validator==2.0.0
 
+# Notificaciones multiplataforma (más estable que win10toast)
+plyer==2.1.0
+
 # === DEPENDENCIAS DE DESARROLLO ===
 pytest>=7.0.0
 black>=22.0.0

@@ -34,6 +34,8 @@ from src.infrastructure.repositories.sqlite_consulta_repository import SQLiteCon
 from src.infrastructure.repositories.sqlite_referente_repository import SQLiteReferenteRepository
 from src.infrastructure.repositories.sqlite_consulta_control_repository import SQLiteConsultaControlRepository
 from src.infrastructure.repositories.sqlite_control_referente_repository import SQLiteControlReferenteRepository
+from src.infrastructure.services.notification_service import WindowsNotificationService
+from src.domain.entities.resultado_ejecucion import EstadoEjecucion
 
 
 class MotorEjecucionService:
@@ -97,6 +99,8 @@ class MotorEjecucionService:
             )
             
             # Servicios
+            self.notification_service = WindowsNotificationService()
+            
             self.ejecucion_service = EjecucionControlService(
                 self.control_repo,
                 self.parametro_repo,
@@ -130,6 +134,9 @@ class MotorEjecucionService:
         self._crear_archivo_pid()
         
         self.ejecutando = True
+        
+        # Notificación de inicio
+        self.notification_service.mostrar_motor_iniciado()
         
         try:
             while self.ejecutando:
@@ -262,6 +269,8 @@ class MotorEjecucionService:
             
             # Log del resultado
             duracion = time.time() - inicio
+            duracion_ms = duracion * 1000
+            
             self.logger.info(
                 f"✅ Programación {programacion.nombre} ejecutada exitosamente "
                 f"({duracion:.2f}s) - Estado: {resultado.estado.value}"
@@ -270,11 +279,45 @@ class MotorEjecucionService:
             if resultado.mensaje:
                 self.logger.info(f"📄 Mensaje: {resultado.mensaje}")
             
+            # Enviar notificación según el resultado
+            if resultado.estado == EstadoEjecucion.CONTROL_DISPARADO:
+                # Control se disparó exitosamente
+                self.notification_service.mostrar_control_disparado(
+                    control_nombre=control.nombre,
+                    filas_procesadas=resultado.total_filas_disparadas,
+                    tiempo_ejecucion_ms=duracion_ms,
+                    mensaje_adicional=f"Programación: {programacion.nombre}"
+                )
+            elif resultado.estado == EstadoEjecucion.ERROR:
+                # Error en la ejecución
+                self.notification_service.mostrar_control_error(
+                    control_nombre=control.nombre,
+                    error_mensaje=resultado.mensaje or "Error desconocido",
+                    tiempo_ejecucion_ms=duracion_ms
+                )
+            
         except Exception as e:
             duracion = time.time() - inicio
+            duracion_ms = duracion * 1000
+            
             self.logger.error(
                 f"❌ Error ejecutando programación {programacion.nombre} "
                 f"({duracion:.2f}s): {e}"
+            )
+            
+            # Notificación de error
+            control_nombre = f"Programación {programacion.nombre}"
+            try:
+                control = self.control_repo.obtener_por_id(programacion.control_id)
+                if control:
+                    control_nombre = control.nombre
+            except:
+                pass
+                
+            self.notification_service.mostrar_control_error(
+                control_nombre=control_nombre,
+                error_mensaje=str(e),
+                tiempo_ejecucion_ms=duracion_ms
             )
     
     def detener(self):
@@ -283,6 +326,9 @@ class MotorEjecucionService:
             self.logger.info("🛑 Deteniendo motor de ejecución...")
             self.ejecutando = False
             self._eliminar_archivo_pid()
+            
+            # Notificación de detención
+            self.notification_service.mostrar_motor_detenido()
         else:
             self.logger.info("🛑 Motor ya estaba detenido")
     

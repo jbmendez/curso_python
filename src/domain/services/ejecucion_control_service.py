@@ -125,67 +125,116 @@ class EjecucionControlService:
             
             # Buscar consulta de disparo
             asociacion_disparo = next((a for a in asociaciones if a.es_disparo), None)
-            if not asociacion_disparo:
-                return self._crear_resultado_error(
-                    control, conexion, valores_parametros, 
-                    "No se encontró consulta de disparo para el control"
+            resultado_disparo = None
+            filas_disparo = 0
+            control_se_dispara = False
+            
+            if asociacion_disparo:
+                # Lógica tradicional con consulta de disparo específica
+                consulta_disparo = self._consulta_repository.obtener_por_id(asociacion_disparo.consulta_id)
+                if not consulta_disparo:
+                    return self._crear_resultado_error(
+                        control, conexion, valores_parametros, 
+                        "No se pudo obtener la consulta de disparo"
+                    )
+                
+                # Ejecutar consulta de disparo
+                resultado_disparo = self._ejecutar_consulta(
+                    consulta_disparo, valores_parametros, conexion, mock_execution, es_disparo=True
                 )
-            
-            # Obtener consulta de disparo
-            consulta_disparo = self._consulta_repository.obtener_por_id(asociacion_disparo.consulta_id)
-            if not consulta_disparo:
-                return self._crear_resultado_error(
-                    control, conexion, valores_parametros, 
-                    "No se pudo obtener la consulta de disparo"
-                )
-            
-            # Ejecutar consulta de disparo
-            resultado_disparo = self._ejecutar_consulta(
-                consulta_disparo, valores_parametros, conexion, mock_execution, es_disparo=True
-            )
-            
-            if resultado_disparo.error:
-                return self._crear_resultado_error(
-                    control, conexion, valores_parametros,
-                    f"Error en consulta de disparo: {resultado_disparo.error}",
-                    resultado_disparo
-                )
-            
-            # Evaluar si el control se dispara basado en su configuración
-            filas_disparo = resultado_disparo.filas_afectadas
-            
-            # Aplicar lógica de disparo según configuración del control
-            if control.disparar_si_hay_datos:
-                # Disparar cuando HAY datos (filas > 0)
-                control_se_dispara = filas_disparo > 0
+                
+                if resultado_disparo.error:
+                    return self._crear_resultado_error(
+                        control, conexion, valores_parametros,
+                        f"Error en consulta de disparo: {resultado_disparo.error}",
+                        resultado_disparo
+                    )
+                
+                # Evaluar si el control se dispara basado en su configuración
+                filas_disparo = resultado_disparo.filas_afectadas
+                
+                # Aplicar lógica de disparo según configuración del control
+                if control.disparar_si_hay_datos:
+                    # Disparar cuando HAY datos (filas > 0)
+                    control_se_dispara = filas_disparo > 0
+                else:
+                    # Disparar cuando NO hay datos (filas == 0)
+                    control_se_dispara = filas_disparo == 0
             else:
-                # Disparar cuando NO hay datos (filas == 0)
-                control_se_dispara = filas_disparo == 0
+                # Nueva lógica: sin consulta de disparo específica
+                # Si solo hay ejecutar_solo_disparo=True pero no hay consulta de disparo, no se puede proceder
+                if ejecutar_solo_disparo:
+                    return self._crear_resultado_error(
+                        control, conexion, valores_parametros, 
+                        "No se puede ejecutar solo disparo: no existe consulta de disparo para el control"
+                    )
+                
+                # Ejecutar todas las consultas para ver si alguna tiene resultados
+                total_filas_todas_consultas = 0
+                todas_asociaciones = [a for a in asociaciones if a.activa]
+                todas_asociaciones.sort(key=lambda x: x.orden)
+                
+                for asociacion in todas_asociaciones:
+                    consulta = self._consulta_repository.obtener_por_id(asociacion.consulta_id)
+                    if consulta:
+                        resultado_temp = self._ejecutar_consulta(
+                            consulta, valores_parametros, conexion, mock_execution, es_disparo=False
+                        )
+                        if not resultado_temp.error:
+                            total_filas_todas_consultas += resultado_temp.filas_afectadas
+                
+                # Aplicar lógica de disparo basada en si hay datos en CUALQUIER consulta
+                if control.disparar_si_hay_datos:
+                    # Disparar cuando HAY datos en alguna consulta
+                    control_se_dispara = total_filas_todas_consultas > 0
+                else:
+                    # Disparar cuando NO hay datos en ninguna consulta
+                    control_se_dispara = total_filas_todas_consultas == 0
+                
+                # Simular resultado de disparo para mantener consistencia en el resultado final
+                if control_se_dispara:
+                    filas_disparo = total_filas_todas_consultas
             
             resultados_disparadas = []
             total_filas_disparadas = 0
             
             # Si el control se dispara y no es solo disparo, ejecutar consultas disparadas
             if control_se_dispara and not ejecutar_solo_disparo:
-                # Obtener consultas disparadas (no de disparo)
-                asociaciones_disparadas = [a for a in asociaciones if not a.es_disparo and a.activa]
-                asociaciones_disparadas.sort(key=lambda x: x.orden)  # Ordenar por orden de ejecución
-                
-                for asociacion in asociaciones_disparadas:
-                    consulta = self._consulta_repository.obtener_por_id(asociacion.consulta_id)
-                    if consulta:
-                        resultado = self._ejecutar_consulta(
-                            consulta, valores_parametros, conexion, mock_execution, es_disparo=False
-                        )
-                        resultados_disparadas.append(resultado)
-                        if not resultado.error:
-                            total_filas_disparadas += resultado.filas_afectadas
+                if asociacion_disparo:
+                    # Lógica tradicional: ejecutar consultas no de disparo
+                    asociaciones_disparadas = [a for a in asociaciones if not a.es_disparo and a.activa]
+                    asociaciones_disparadas.sort(key=lambda x: x.orden)  # Ordenar por orden de ejecución
+                    
+                    for asociacion in asociaciones_disparadas:
+                        consulta = self._consulta_repository.obtener_por_id(asociacion.consulta_id)
+                        if consulta:
+                            resultado = self._ejecutar_consulta(
+                                consulta, valores_parametros, conexion, mock_execution, es_disparo=False
+                            )
+                            resultados_disparadas.append(resultado)
+                            if not resultado.error:
+                                total_filas_disparadas += resultado.filas_afectadas
+                else:
+                    # Nueva lógica: re-ejecutar todas las consultas para los resultados finales
+                    # (ya las ejecutamos para evaluar, pero necesitamos los resultados completos)
+                    todas_asociaciones = [a for a in asociaciones if a.activa]
+                    todas_asociaciones.sort(key=lambda x: x.orden)
+                    
+                    for asociacion in todas_asociaciones:
+                        consulta = self._consulta_repository.obtener_por_id(asociacion.consulta_id)
+                        if consulta:
+                            resultado = self._ejecutar_consulta(
+                                consulta, valores_parametros, conexion, mock_execution, es_disparo=False
+                            )
+                            resultados_disparadas.append(resultado)
+                            if not resultado.error:
+                                total_filas_disparadas += resultado.filas_afectadas
             
             # Determinar estado final
             estado = self._determinar_estado(control_se_dispara, filas_disparo, resultados_disparadas)
             
             # Crear mensaje
-            mensaje = self._crear_mensaje(control, estado, filas_disparo, total_filas_disparadas, ejecutar_solo_disparo)
+            mensaje = self._crear_mensaje(control, estado, filas_disparo, total_filas_disparadas, ejecutar_solo_disparo, asociacion_disparo is not None)
             
             tiempo_total = (time.time() - inicio_tiempo) * 1000  # en millisegundos
             
@@ -336,23 +385,37 @@ class EjecucionControlService:
         estado: EstadoEjecucion, 
         filas_disparo: int, 
         total_filas_disparadas: int,
-        ejecutar_solo_disparo: bool
+        ejecutar_solo_disparo: bool,
+        tiene_consulta_disparo: bool = True
     ) -> str:
         """Crea el mensaje descriptivo del resultado"""
         if estado == EstadoEjecucion.ERROR:
             return "Error durante la ejecución del control"
         elif estado == EstadoEjecucion.SIN_DATOS:
-            if control.disparar_si_hay_datos:
-                return f"Control no disparado. Consulta de disparo no encontró datos ({filas_disparo} filas)"
+            if tiene_consulta_disparo:
+                if control.disparar_si_hay_datos:
+                    return f"Control no disparado. Consulta de disparo no encontró datos ({filas_disparo} filas)"
+                else:
+                    return f"Control no disparado. Consulta de disparo encontró datos ({filas_disparo} filas)"
             else:
-                return f"Control no disparado. Consulta de disparo encontró datos ({filas_disparo} filas)"
+                if control.disparar_si_hay_datos:
+                    return f"Control no disparado. Las consultas no encontraron datos ({filas_disparo} filas totales)"
+                else:
+                    return f"Control no disparado. Las consultas encontraron datos ({filas_disparo} filas totales)"
         elif estado == EstadoEjecucion.CONTROL_DISPARADO:
             if ejecutar_solo_disparo:
-                condicion = "sin datos" if not control.disparar_si_hay_datos else "con datos"
-                return f"Consulta de disparo ejecutada: {filas_disparo} filas ({condicion})"
+                if tiene_consulta_disparo:
+                    condicion = "sin datos" if not control.disparar_si_hay_datos else "con datos"
+                    return f"Consulta de disparo ejecutada: {filas_disparo} filas ({condicion})"
+                else:
+                    return "No se puede ejecutar solo disparo: el control no tiene consulta de disparo específica"
             else:
-                condicion = "sin datos" if not control.disparar_si_hay_datos else "con datos"
-                return f"Control disparado ({condicion}): {filas_disparo} filas de disparo, {total_filas_disparadas} filas procesadas"
+                if tiene_consulta_disparo:
+                    condicion = "sin datos" if not control.disparar_si_hay_datos else "con datos"
+                    return f"Control disparado ({condicion}): {filas_disparo} filas de disparo, {total_filas_disparadas} filas procesadas"
+                else:
+                    condicion = "sin datos" if not control.disparar_si_hay_datos else "con datos"
+                    return f"Control disparado por resultados en consultas ({condicion}): {total_filas_disparadas} filas procesadas"
         else:
             return "Control ejecutado exitosamente"
     
