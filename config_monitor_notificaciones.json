@@ -1,0 +1,29 @@
+{
+  "carpetas_monitoreadas": [
+    "C:\\temp\\reportes_test",
+    "C:\\temp\\notificaciones_compartidas"
+  ],
+  "configuracion": {
+    "intervalo_segundos": 5,
+    "mantener_logs_dias": 7,
+    "timeout_notificaciones": 8
+  },
+  "filtros": {
+    "procesar_solo_nuevos": true,
+    "tipos_permitidos": [
+      "control_disparado",
+      "control_error",
+      "motor_iniciado",
+      "motor_detenido",
+      "motor_parado"
+    ]
+  },
+  "comentarios": {
+    "carpetas_monitoreadas": "Lista de carpetas que el monitor revisará en busca de archivos de notificación",
+    "ejemplos_carpetas": [
+      "\\\\servidor\\carpeta_compartida",
+      "Z:\\unidad_mapeada\\notificaciones",
+      "C:\\carpeta_local\\reportes"
+    ]
+  }
+}

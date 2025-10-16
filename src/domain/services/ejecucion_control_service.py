@@ -28,6 +28,7 @@ from src.domain.repositories.consulta_control_repository import ConsultaControlR
 from src.domain.repositories.conexion_repository import ConexionRepository
 from src.domain.repositories.control_referente_repository import ControlReferenteRepository
 from src.domain.services.excel_generator_service import ExcelGeneratorService
+from src.infrastructure.services.notification_file_service import NotificationFileService
 
 
 class EjecucionControlService:
@@ -51,6 +52,7 @@ class EjecucionControlService:
         self._consulta_control_repository = consulta_control_repository
         self._control_referente_repository = control_referente_repository
         self._excel_generator = ExcelGeneratorService()
+        self._notification_file_service = NotificationFileService()
     
     def _es_consulta_lectura(self, sql: str) -> bool:
         """Determina si una consulta SQL es de lectura (devuelve datos)"""
@@ -1032,6 +1034,21 @@ class EjecucionControlService:
                     )
                     
                     print(f"DEBUG - Archivo Excel generado para referente {referente.nombre}: {archivo_generado}")
+                    
+                    # Generar archivo de notificación en la misma carpeta
+                    archivo_notificacion = self._notification_file_service.crear_archivo_notificacion_control(
+                        carpeta_destino=referente.path_archivos,
+                        control_nombre=control.nombre,
+                        filas_procesadas=sum(len(cr.get('datos', [])) for cr in consultas_resultados),
+                        tiempo_ejecucion_ms=resultado_ejecucion.tiempo_ejecucion_ms,
+                        archivo_excel=os.path.basename(archivo_generado),
+                        mensaje_adicional=f"Control ejecutado para referente: {referente.nombre}"
+                    )
+                    
+                    if archivo_notificacion:
+                        print(f"DEBUG - Archivo de notificación generado: {archivo_notificacion}")
+                    else:
+                        print(f"DEBUG - Error al generar archivo de notificación")
                     
                 except Exception as e:
                     print(f"ERROR - No se pudo generar Excel para referente {referente.nombre}: {str(e)}")

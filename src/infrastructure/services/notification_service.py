@@ -32,6 +32,35 @@ class WindowsNotificationService:
         """Verifica si las notificaciones están disponibles"""
         return NOTIFICATIONS_AVAILABLE
     
+    def _truncar_texto(self, texto: str, max_length: int) -> str:
+        """
+        Trunca el texto si excede la longitud máxima
+        
+        Args:
+            texto: Texto a truncar
+            max_length: Longitud máxima permitida
+            
+        Returns:
+            str: Texto truncado si es necesario
+        """
+        if len(texto) <= max_length:
+            return texto
+        return texto[:max_length-3] + "..."
+    
+    def _truncar_control_nombre(self, control_nombre: str) -> str:
+        """
+        Trunca nombres de control largos para títulos de notificación
+        
+        Args:
+            control_nombre: Nombre del control
+            
+        Returns:
+            str: Nombre truncado apropiado para títulos
+        """
+        # Límite conservador para títulos (Windows tiene límite ~64 chars)
+        max_title_length = 40
+        return self._truncar_texto(control_nombre, max_title_length)
+    
     def _mostrar_notificacion(self, titulo: str, mensaje: str, timeout: int = 10) -> bool:
         """
         Método interno para mostrar notificaciones
@@ -49,9 +78,13 @@ class WindowsNotificationService:
             return False
         
         try:
+            # Aplicar límites de caracteres para evitar errores
+            titulo_truncado = self._truncar_texto(titulo, 60)  # Límite conservador para títulos
+            mensaje_truncado = self._truncar_texto(mensaje, 200)  # Límite para mensajes
+            
             notification.notify(
-                title=titulo,
-                message=mensaje,
+                title=titulo_truncado,
+                message=mensaje_truncado,
                 timeout=timeout,
                 app_name="Motor de Controles"
             )
@@ -87,7 +120,9 @@ class WindowsNotificationService:
         if mensaje_adicional:
             mensaje += f"\n{mensaje_adicional}"
         
-        titulo = f"✅ Control Ejecutado: {control_nombre}"
+        # Truncar nombre del control para el título
+        control_truncado = self._truncar_control_nombre(control_nombre)
+        titulo = f"✅ Control: {control_truncado}"
         
         resultado = self._mostrar_notificacion(titulo, mensaje, timeout=10)
         if resultado:
@@ -120,7 +155,9 @@ class WindowsNotificationService:
             tiempo_str = f"{tiempo_ejecucion_ms:.0f}ms" if tiempo_ejecucion_ms < 1000 else f"{tiempo_ejecucion_ms/1000:.1f}s"
             mensaje += f"\nTiempo: {tiempo_str}"
         
-        titulo = f"❌ Error en Control: {control_nombre}"
+        # Truncar nombre del control para el título
+        control_truncado = self._truncar_control_nombre(control_nombre)
+        titulo = f"❌ Error: {control_truncado}"
         
         resultado = self._mostrar_notificacion(titulo, mensaje, timeout=15)
         if resultado:
@@ -159,6 +196,25 @@ class WindowsNotificationService:
         resultado = self._mostrar_notificacion(titulo, mensaje, timeout=5)
         if resultado:
             self.logger.info("Notificación de detención de motor mostrada")
+        
+        return resultado
+    
+    def mostrar_motor_parado(self, razon: str) -> bool:
+        """
+        Muestra una notificación cuando el motor se para por una razón específica
+        
+        Args:
+            razon: Razón por la cual se paró el motor
+            
+        Returns:
+            bool: True si la notificación se mostró exitosamente
+        """
+        razon_corta = razon[:150] + "..." if len(razon) > 150 else razon
+        titulo = "🛑 Motor Detenido"
+        
+        resultado = self._mostrar_notificacion(titulo, razon_corta, timeout=10)
+        if resultado:
+            self.logger.info("Notificación de motor detenido mostrada")
         
         return resultado
     
